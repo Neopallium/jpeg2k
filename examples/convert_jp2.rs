@@ -6,7 +6,7 @@ use anyhow::Result;
 
 use image::DynamicImage;
 
-use ::jpeg2k::*;
+use jpeg2k::*;
 
 fn main() -> Result<()> {
   dotenv::dotenv().ok();
