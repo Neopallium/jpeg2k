@@ -63,7 +63,7 @@ fn setup(
   asset_server: Res<AssetServer>,
 ) {
 	// Load j2k, jp2, j2c, images.
-  let texture_handle = asset_server.load("rust_jpeg2000.j2k");
+  let texture_handle = asset_server.load("example.j2k");
 	// <Use the texture handle>
 }
 

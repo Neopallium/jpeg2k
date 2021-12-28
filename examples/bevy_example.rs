@@ -21,7 +21,7 @@ fn setup(
   mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
   let name = env::args().nth(1)
-    .unwrap_or_else(|| "rust_jpeg2000.j2k".to_string());
+    .unwrap_or_else(|| "example.j2k".to_string());
 
   let texture_handle = asset_server.load(name.as_str());
   // ui camera
