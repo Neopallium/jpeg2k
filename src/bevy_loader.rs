@@ -6,6 +6,7 @@ use bevy::{
 
 use super::*;
 
+/// Jpeg 2000 asset loader for Bevy.
 #[derive(Default)]
 pub struct Jpeg2KAssetLoader;
 
@@ -28,6 +29,7 @@ impl AssetLoader for Jpeg2KAssetLoader {
   }
 }
 
+/// Try to convert a loaded Jpeg 2000 image into a Bevy `Texture`.
 impl TryFrom<Image> for Texture {
   type Error = anyhow::Error;
 
@@ -93,6 +95,7 @@ impl TryFrom<Image> for Texture {
   }
 }
 
+/// Jpeg 2000 asset plugin for Bevy.
 #[derive(Default, Clone, Debug)]
 pub struct Jpeg2KPlugin;
 

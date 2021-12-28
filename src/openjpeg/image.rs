@@ -52,11 +52,13 @@ impl WrappedImage {
   }
 }
 
+/// A Jpeg2000 Image.
 pub struct Image {
   pub(crate) img: WrappedImage,
 }
 
 impl Image {
+  /// Load a Jpeg 2000 image from bytes.  It will detect the J2K format.
   pub fn from_bytes(buf: &[u8]) -> Result<Self> {
     let format = j2k_detect_format(buf)?;
 
@@ -74,15 +76,18 @@ impl Image {
     })
   }
 
+  /// Image width.
   pub fn width(&self) -> u32 {
     self.img.width()
   }
 
+  /// Image height.
   pub fn height(&self) -> u32 {
     self.img.height()
   }
 }
 
+/// Try to convert a loaded Jpeg 2000 image into a `image::DynamicImage`.
 #[cfg(feature = "image")]
 impl TryFrom<Image> for ::image::DynamicImage {
   type Error = anyhow::Error;
