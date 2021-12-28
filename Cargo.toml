@@ -10,7 +10,9 @@ repository = "https://github.com/Neopallium/jpeg2k"
 homepage = "https://github.com/Neopallium/jpeg2k"
 
 [features]
-default = ["image", "bevy"]
+default = ["image", "bevy", "threads"]
+
+threads = ["openjpeg-sys/threads"]
 
 [dependencies]
 dotenv = "0.15"
@@ -24,4 +26,4 @@ bevy = { version = "0.5", optional = true }
 
 image = { version = "0.23", optional = true }
 
-openjpeg-sys = { version = "1.0" }
+openjpeg-sys = { version = "1.0", default-features = false }
