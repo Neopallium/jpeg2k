@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::prelude::*;
 use std::env;
 
 use anyhow::Result;
@@ -17,11 +15,14 @@ fn main() -> Result<()> {
   let savename = env::args().nth(2)
     .unwrap_or_else(|| "test.jpg".to_string());
 
+  /*
   let mut file = File::open(jp2_filename)?;
   let mut buf = Vec::new();
   file.read_to_end(&mut buf)?;
 
   let jp2_image = Image::from_bytes(&mut buf)?;
+  */
+  let jp2_image = Image::from_file(jp2_filename)?;
 
   println!("jp2_image: width={:?}, height={:?}", jp2_image.width(), jp2_image.height());
 

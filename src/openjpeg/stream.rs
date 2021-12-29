@@ -1,5 +1,8 @@
+use std::ffi::CString;
 use std::os::raw::c_void;
 use std::ptr;
+
+use std::path::Path;
 
 // TODO: Create error type.
 use anyhow::Result;
@@ -56,6 +59,7 @@ impl<'a> WrappedSlice<'a> {
 
 pub(crate) struct Stream<'a> {
   stream: *mut sys::opj_stream_t,
+  is_input: bool,
   buf: Option<&'a [u8]>,
 }
 
@@ -69,22 +73,22 @@ impl Drop for Stream<'_> {
 
 impl std::fmt::Debug for Stream<'_> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    if let Some(boxed) = &self.buf {
-      f.write_fmt(format_args!("BufStream: buf.len {}", boxed.len()))
+    if let Some(slice) = &self.buf {
+      f.write_fmt(format_args!("BufStream: len={}", slice.len()))
     } else {
       f.write_fmt(format_args!("FileStream"))
     }
   }
 }
 
-extern "C" fn buf_stream_free_fn(p_data: *mut c_void) {
-  unsafe {
-    let ptr = p_data as *mut WrappedSlice;
-    drop(Box::from_raw(ptr))
-  }
+extern "C" fn buf_read_stream_free_fn(p_data: *mut c_void) {
+  let ptr = p_data as *mut WrappedSlice;
+  drop(unsafe {
+    Box::from_raw(ptr)
+  })
 }
 
-extern "C" fn buf_stream_read_fn(p_buffer: *mut c_void, nb_bytes: usize, p_data: *mut c_void) -> usize {
+extern "C" fn buf_read_stream_read_fn(p_buffer: *mut c_void, nb_bytes: usize, p_data: *mut c_void) -> usize {
   if p_buffer.is_null() || nb_bytes == 0 {
     return 0;
   }
@@ -96,12 +100,12 @@ extern "C" fn buf_stream_read_fn(p_buffer: *mut c_void, nb_bytes: usize, p_data:
   slice.read_into(out_buf)
 }
 
-extern "C" fn buf_stream_skip_fn(nb_bytes: i64, p_data: *mut c_void) -> i64 {
+extern "C" fn buf_read_stream_skip_fn(nb_bytes: i64, p_data: *mut c_void) -> i64 {
   let slice = unsafe { &mut *(p_data as *mut WrappedSlice) };
   slice.consume(nb_bytes as usize) as i64
 }
 
-extern "C" fn buf_stream_seek_fn(nb_bytes: i64, p_data: *mut c_void) -> i32 {
+extern "C" fn buf_read_stream_seek_fn(nb_bytes: i64, p_data: *mut c_void) -> i32 {
   let slice = unsafe { &mut *(p_data as *mut WrappedSlice) };
   let seek_offset = nb_bytes as usize;
   let new_offset = slice.seek(seek_offset);
@@ -117,23 +121,43 @@ impl<'a> Stream<'a> {
     unsafe {
       let p_data = Box::into_raw(data) as *mut c_void;
       let stream = sys::opj_stream_default_create(1);
-      sys::opj_stream_set_read_function(stream, Some(buf_stream_read_fn));
-      sys::opj_stream_set_skip_function(stream, Some(buf_stream_skip_fn));
-      sys::opj_stream_set_seek_function(stream, Some(buf_stream_seek_fn));
+      sys::opj_stream_set_read_function(stream, Some(buf_read_stream_read_fn));
+      sys::opj_stream_set_skip_function(stream, Some(buf_read_stream_skip_fn));
+      sys::opj_stream_set_seek_function(stream, Some(buf_read_stream_seek_fn));
       sys::opj_stream_set_user_data_length(stream, len as u64);
       sys::opj_stream_set_user_data(
         stream,
         p_data,
-        Some(buf_stream_free_fn));
+        Some(buf_read_stream_free_fn));
 
       Self {
         stream,
+        is_input: true,
         buf: Some(buf),
       }
     }
   }
 
+  pub(crate) fn from_file<P: AsRef<Path>>(path: P) -> Result<(Self, J2KFormat)> {
+    let path = path.as_ref();
+    let format = j2k_detect_format_from_extension(path.extension())?;
+    let str_path = path.to_str().ok_or_else(|| anyhow!("Invalid filename."))?;
+    let c_path = CString::new(str_path.as_bytes())?;
+
+    let stream = unsafe {
+      sys::opj_stream_create_default_file_stream(c_path.as_ptr(), 1)
+    };
+    Ok((Self {
+      stream,
+      is_input: true,
+      buf: None,
+    }, format))
+  }
+
   pub(crate) fn read_header(&self, codec: &Codec) -> Result<WrappedImage> {
+    if !self.is_input {
+      Err(anyhow!("Called `read_header` on an output stream."))?;
+    }
     let mut img: *mut sys::opj_image_t = ptr::null_mut();
 
     let res = unsafe { sys::opj_read_header(self.stream, codec.as_ptr(), &mut img)};
@@ -147,6 +171,9 @@ impl<'a> Stream<'a> {
   }
 
   pub(crate) fn decode(&self, codec: &Codec, img: &WrappedImage) -> Result<()> {
+    if !self.is_input {
+      Err(anyhow!("Called `decode` on an output stream."))?;
+    }
     let res = unsafe {
       sys::opj_decode(codec.as_ptr(), self.stream, img.as_ptr())
     };

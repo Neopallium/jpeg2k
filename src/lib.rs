@@ -27,6 +27,19 @@ pub fn j2k_detect_format(buf: &[u8]) -> Result<J2KFormat> {
   }
 }
 
+/// Detect Jpeg 2000 format from file extension.
+pub fn j2k_detect_format_from_extension(ext: Option<&std::ffi::OsStr>) -> Result<J2KFormat> {
+  let lower_ext = ext
+    .and_then(|e| e.to_str())
+    .map(|e| e.to_ascii_lowercase());
+  match lower_ext.as_ref().map(|s| s.as_str()) {
+    Some("jp2") => Ok(J2KFormat::JP2),
+    Some("j2k") | Some("j2c") => Ok(J2KFormat::J2K),
+    Some(_) => Err(anyhow!("Unknown file extension")),
+    None => Err(anyhow!("No file extension")),
+  }
+}
+
 mod openjpeg;
 pub use openjpeg::*;
 

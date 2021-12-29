@@ -1,5 +1,7 @@
 use std::ptr;
 
+use std::path::Path;
+
 // TODO: Create error type.
 use anyhow::Result;
 
@@ -63,6 +65,22 @@ impl Image {
     let format = j2k_detect_format(buf)?;
 
     let stream = Stream::from_bytes(buf);
+
+    let params = DecodeParamers::default();
+    let codec = Codec::new_decompress(format, params)?;
+
+    let img = stream.read_header(&codec)?;
+
+    stream.decode(&codec, &img)?;
+
+    Ok(Self{
+      img,
+    })
+  }
+
+  /// Load a Jpeg 2000 image from file.  It will detect the J2K format.
+  pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
+    let (stream, format) = Stream::from_file(path)?;
 
     let params = DecodeParamers::default();
     let codec = Codec::new_decompress(format, params)?;
