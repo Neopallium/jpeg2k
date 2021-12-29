@@ -34,7 +34,7 @@ pub fn j2k_detect_format_from_extension(ext: Option<&std::ffi::OsStr>) -> Result
     .map(|e| e.to_ascii_lowercase());
   match lower_ext.as_ref().map(|s| s.as_str()) {
     Some("jp2") => Ok(J2KFormat::JP2),
-    Some("j2k") | Some("j2c") => Ok(J2KFormat::J2K),
+    Some("j2k") | Some("j2c") | Some("jpc") => Ok(J2KFormat::J2K),
     Some(_) => Err(anyhow!("Unknown file extension")),
     None => Err(anyhow!("No file extension")),
   }

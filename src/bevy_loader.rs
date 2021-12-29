@@ -25,7 +25,7 @@ impl AssetLoader for Jpeg2KAssetLoader {
   }
 
   fn extensions(&self) -> &[&str] {
-    &["j2k", "jp2", "j2c"]
+    &["j2k", "jp2", "j2c", "jpc"]
   }
 }
 
