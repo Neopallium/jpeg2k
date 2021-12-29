@@ -138,26 +138,34 @@ impl<'a> Stream<'a> {
     }
   }
 
-  pub(crate) fn from_file<P: AsRef<Path>>(path: P) -> Result<(Self, J2KFormat)> {
+  pub(crate) fn new_file<P: AsRef<Path>>(path: P, is_input: bool) -> Result<(Self, J2KFormat)> {
     let path = path.as_ref();
     let format = j2k_detect_format_from_extension(path.extension())?;
     let str_path = path.to_str().ok_or_else(|| anyhow!("Invalid filename."))?;
     let c_path = CString::new(str_path.as_bytes())?;
 
+    let c_input = if is_input { 1 } else { 0 };
     let stream = unsafe {
-      sys::opj_stream_create_default_file_stream(c_path.as_ptr(), 1)
+      sys::opj_stream_create_default_file_stream(c_path.as_ptr(), c_input)
     };
     Ok((Self {
       stream,
-      is_input: true,
+      is_input,
       buf: None,
     }, format))
   }
 
+  pub(crate) fn from_file<P: AsRef<Path>>(path: P) -> Result<(Self, J2KFormat)> {
+    Self::new_file(path, true)
+  }
+
+  pub(crate) fn to_file<P: AsRef<Path>>(path: P) -> Result<(Self, J2KFormat)> {
+    Self::new_file(path, false)
+  }
+
   pub(crate) fn read_header(&self, codec: &Codec) -> Result<WrappedImage> {
-    if !self.is_input {
-      Err(anyhow!("Called `read_header` on an output stream."))?;
-    }
+    assert!(self.is_input);
+    assert!(codec.is_decoder());
     let mut img: *mut sys::opj_image_t = ptr::null_mut();
 
     let res = unsafe { sys::opj_read_header(self.stream, codec.as_ptr(), &mut img)};
@@ -171,18 +179,33 @@ impl<'a> Stream<'a> {
   }
 
   pub(crate) fn decode(&self, codec: &Codec, img: &WrappedImage) -> Result<()> {
-    if !self.is_input {
-      Err(anyhow!("Called `decode` on an output stream."))?;
-    }
+    assert!(self.is_input);
+    assert!(codec.is_decoder());
+
     let res = unsafe {
-      sys::opj_decode(codec.as_ptr(), self.stream, img.as_ptr())
+      sys::opj_decode(codec.as_ptr(), self.stream, img.as_ptr()) == 1 &&
+      sys::opj_end_decompress(codec.as_ptr(), self.stream) == 1
     };
-    if res != 1 {
+    if !res {
       Err(anyhow!("Failed to decode image."))
     } else {
       Ok(())
     }
   }
+
+  pub(crate) fn encode(&self, codec: &Codec, img: &WrappedImage) -> Result<()> {
+    assert!(!self.is_input);
+    assert!(!codec.is_decoder());
+
+    let res = unsafe {
+      sys::opj_start_compress(codec.as_ptr(), img.as_ptr(), self.stream) == 1 &&
+      sys::opj_encode(codec.as_ptr(), self.stream) == 1 &&
+      sys::opj_end_compress(codec.as_ptr(), self.stream) == 1
+    };
+    if !res {
+      Err(anyhow!("Failed to encode image."))
+    } else {
+      Ok(())
+    }
+  }
 }
-
-

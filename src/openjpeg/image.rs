@@ -94,6 +94,19 @@ impl Image {
     })
   }
 
+  /// Save image to Jpeg 2000 file.  It will detect the J2K format.
+  pub fn save_as_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    let (stream, format) = Stream::to_file(path)?;
+
+    let codec = Codec::new_compress(format)?;
+    let params = EncodeParamers::default();
+    codec.setup_encoder(params, &self.img)?;
+
+    stream.encode(&codec, &self.img)?;
+
+    Ok(())
+  }
+
   /// Image width.
   pub fn width(&self) -> u32 {
     self.img.width()

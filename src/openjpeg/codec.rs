@@ -19,12 +19,27 @@ impl Default for DecodeParamers {
   }
 }
 
-pub(crate) struct Codec(ptr::NonNull<sys::opj_codec_t>);
+pub(crate) struct EncodeParamers(sys::opj_cparameters);
+
+impl Default for EncodeParamers {
+  fn default() -> Self {
+    Self(unsafe {
+      let mut ptr = std::mem::zeroed::<sys::opj_cparameters>();
+      sys::opj_set_default_encoder_parameters(&mut ptr as *mut _);
+      ptr
+    })
+  }
+}
+
+pub(crate) struct Codec {
+  codec: ptr::NonNull<sys::opj_codec_t>,
+  is_decoder: bool,
+}
 
 impl Drop for Codec {
   fn drop(&mut self) {
     unsafe {
-      sys::opj_destroy_codec(self.0.as_ptr());
+      sys::opj_destroy_codec(self.codec.as_ptr());
     }
   }
 }
@@ -70,13 +85,53 @@ impl Codec {
       if res != 1 {
         Err(anyhow!("Failed to setup decoder with parameters."))?;
       }
-      Ok(Self(ptr))
+      Ok(Self {
+        codec: ptr,
+        is_decoder: true,
+      })
     } else {
       Err(anyhow!("Codec not supported: {:?}", fmt))
     }
   }
 
+  pub(crate) fn new_compress(fmt: J2KFormat) -> Result<Self> {
+    let format: sys::CODEC_FORMAT = fmt.into();
+    let ptr = unsafe {
+      ptr::NonNull::new(sys::opj_create_compress(format))
+    };
+    if let Some(ptr) = ptr {
+      let null = ptr::null_mut();
+      unsafe {
+        sys::opj_set_info_handler(ptr.as_ptr(), Some(log_info), null);
+        sys::opj_set_warning_handler(ptr.as_ptr(), Some(log_warn), null);
+        sys::opj_set_error_handler(ptr.as_ptr(), Some(log_error), null);
+      }
+
+      Ok(Self {
+        codec: ptr,
+        is_decoder: false,
+      })
+    } else {
+      Err(anyhow!("Codec not supported: {:?}", fmt))
+    }
+  }
+
+  pub(crate) fn setup_encoder(&self, mut params: EncodeParamers, img: &WrappedImage) -> Result<()> {
+    let res = unsafe {
+      sys::opj_setup_encoder(self.as_ptr(), &mut params.0, img.as_ptr())
+    };
+    if res == 1 {
+      Ok(())
+    } else {
+      Err(anyhow!("Failed to setup encoder with parameters."))
+    }
+  }
+
+  pub(crate) fn is_decoder(&self) -> bool {
+    self.is_decoder
+  }
+
   pub(crate) fn as_ptr(&self) -> *mut sys::opj_codec_t {
-    self.0.as_ptr()
+    self.codec.as_ptr()
   }
 }

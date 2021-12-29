@@ -4,8 +4,6 @@ Safe wrapper for `openjpeg-sys` with Bevy asset support.
 ## Example: Bevy asset loader
 
 ```rust
-use std::fs::File;
-use std::io::prelude::*;
 use std::env;
 
 use anyhow::Result;
@@ -20,13 +18,8 @@ fn main() -> Result<()> {
   let savename = env::args().nth(2)
     .unwrap_or_else(|| "test.jpg".to_string());
 
-  // Load file bytes.
-  let mut file = File::open(jp2_filename)?;
-  let mut buf = Vec::new();
-  file.read_to_end(&mut buf)?;
-
-  // Load jpeg 2000 file from bytes.
-  let jp2_image = Image::from_bytes(&mut buf)?;
+  // Load jpeg 2000 file from file.
+  let jp2_image = Image::from_file(jp2_filename)?;
 
   println!("jp2_image: width={:?}, height={:?}", jp2_image.width(), jp2_image.height());
 
