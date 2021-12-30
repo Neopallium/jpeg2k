@@ -139,7 +139,7 @@ impl<'a> Stream<'a> {
 
   pub(crate) fn new_file<P: AsRef<Path>>(path: P, is_input: bool) -> Result<Self> {
     let path = path.as_ref();
-    if !path.exists() {
+    if !path.exists() && is_input {
       return Err(Error::FileNotFoundError(format!("{:?}", path)));
     }
     let format = j2k_detect_format_from_extension(path.extension())?;
