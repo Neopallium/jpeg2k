@@ -16,6 +16,8 @@ default = ["image", "bevy"]
 dotenv = "0.15"
 env_logger = "0.9"
 log = "0.4"
+
+thiserror = "1.0.30"
 anyhow = "1.0"
 
 bevy = { version = "0.5", optional = true }

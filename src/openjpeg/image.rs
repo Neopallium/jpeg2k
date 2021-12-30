@@ -2,9 +2,6 @@ use std::ptr;
 
 use std::path::Path;
 
-// TODO: Create error type.
-use anyhow::Result;
-
 use super::*;
 
 pub(crate) struct WrappedImage(ptr::NonNull<sys::opj_image_t>);
@@ -20,7 +17,7 @@ impl Drop for WrappedImage {
 impl WrappedImage {
   pub(crate) fn new(ptr: *mut sys::opj_image_t) -> Result<Self> {
     let ptr = ptr::NonNull::new(ptr)
-      .ok_or_else(|| anyhow!("Null pointer."))?;
+      .ok_or_else(|| Error::NullPointerError("Image: NULL `opj_image_t`"))?;
     Ok(Self(ptr))
   }
 
@@ -121,7 +118,7 @@ impl Image {
 /// Try to convert a loaded Jpeg 2000 image into a `image::DynamicImage`.
 #[cfg(feature = "image")]
 impl TryFrom<Image> for ::image::DynamicImage {
-  type Error = anyhow::Error;
+  type Error = Error;
 
   fn try_from(img: Image) -> Result<::image::DynamicImage> {
     use ::image::*;
@@ -137,7 +134,7 @@ impl TryFrom<Image> for ::image::DynamicImage {
         let pixels = r.iter().map(|r| *r as u8).collect();
 
         let gray = GrayImage::from_vec(width, height, pixels)
-          .ok_or_else(|| anyhow!("Not enough pixels."))?;
+          .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
 
         DynamicImage::ImageLuma8(gray)
       }
@@ -155,7 +152,7 @@ impl TryFrom<Image> for ::image::DynamicImage {
           pixels.extend_from_slice(&[*r as u8, *g as u8, *b as u8]);
         }
         let rgb = RgbImage::from_vec(width, height, pixels)
-          .ok_or_else(|| anyhow!("Not enough pixels."))?;
+          .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
 
         DynamicImage::ImageRgb8(rgb)
       }
@@ -174,12 +171,12 @@ impl TryFrom<Image> for ::image::DynamicImage {
           pixels.extend_from_slice(&[*r as u8, *g as u8, *b as u8, *a as u8]);
         }
         let rgba = RgbaImage::from_vec(width, height, pixels)
-          .ok_or_else(|| anyhow!("Not enough pixels."))?;
+          .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
 
         DynamicImage::ImageRgba8(rgba)
       }
       _ => {
-        Err(anyhow!("Unsupported number of components: {:?}", img.num_components()))?
+        return Err(Error::UnsupportedComponentsError(img.num_components()));
       }
     };
     Ok(img)

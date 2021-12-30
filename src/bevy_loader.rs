@@ -31,7 +31,7 @@ impl AssetLoader for Jpeg2KAssetLoader {
 
 /// Try to convert a loaded Jpeg 2000 image into a Bevy `Texture`.
 impl TryFrom<Image> for Texture {
-  type Error = anyhow::Error;
+  type Error = Error;
 
   fn try_from(img: Image) -> Result<Texture> {
     use bevy::render::texture::*;
@@ -83,7 +83,7 @@ impl TryFrom<Image> for Texture {
         pixels
       }
       _ => {
-        return Err(anyhow!("Unsupported number of components: {:?}", img.num_components()));
+        return Err(Error::UnsupportedComponentsError(img.num_components()));
       }
     };
 

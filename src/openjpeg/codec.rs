@@ -2,9 +2,6 @@ use std::os::raw::{c_char, c_void};
 use std::ffi::CStr;
 use std::ptr;
 
-// TODO: Create error type.
-use anyhow::Result;
-
 use super::*;
 
 pub(crate) struct DecodeParamers(sys::opj_dparameters);
@@ -82,15 +79,16 @@ impl Codec {
       let res = unsafe {
         sys::opj_setup_decoder(ptr.as_ptr(), &mut params.0)
       };
-      if res != 1 {
-        Err(anyhow!("Failed to setup decoder with parameters."))?;
+      if res == 1 {
+        Ok(Self {
+          codec: ptr,
+          is_decoder: true,
+        })
+      } else {
+        Err(Error::CreateCodecError(format!("Failed to setup decoder with parameters.")))
       }
-      Ok(Self {
-        codec: ptr,
-        is_decoder: true,
-      })
     } else {
-      Err(anyhow!("Codec not supported: {:?}", fmt))
+      Err(Error::CreateCodecError(format!("Codec not supported: {:?}", fmt)))
     }
   }
 
@@ -112,7 +110,7 @@ impl Codec {
         is_decoder: false,
       })
     } else {
-      Err(anyhow!("Codec not supported: {:?}", fmt))
+      Err(Error::CreateCodecError(format!("Codec not supported: {:?}", fmt)))
     }
   }
 
@@ -123,7 +121,7 @@ impl Codec {
     if res == 1 {
       Ok(())
     } else {
-      Err(anyhow!("Failed to setup encoder with parameters."))
+      Err(Error::CreateCodecError(format!("Failed to setup encoder with parameters.")))
     }
   }
 

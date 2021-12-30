@@ -4,9 +4,6 @@ use std::ptr;
 
 use std::path::Path;
 
-// TODO: Create error type.
-use anyhow::Result;
-
 use super::*;
 
 struct WrappedSlice<'a> {
@@ -140,14 +137,21 @@ impl<'a> Stream<'a> {
 
   pub(crate) fn new_file<P: AsRef<Path>>(path: P, is_input: bool) -> Result<(Self, J2KFormat)> {
     let path = path.as_ref();
+    if !path.exists() {
+      return Err(Error::FileNotFoundError(format!("{:?}", path)));
+    }
     let format = j2k_detect_format_from_extension(path.extension())?;
-    let str_path = path.to_str().ok_or_else(|| anyhow!("Invalid filename."))?;
-    let c_path = CString::new(str_path.as_bytes())?;
+    let c_path = path.to_str()
+      .and_then(|p| CString::new(p.as_bytes()).ok())
+      .ok_or_else(|| Error::BadFilenameError(format!("Can't pass filename to openjpeg-sys: {:?}", path)))?;
 
     let c_input = if is_input { 1 } else { 0 };
     let stream = unsafe {
       sys::opj_stream_create_default_file_stream(c_path.as_ptr(), c_input)
     };
+    if stream.is_null() {
+      return Err(Error::NullPointerError("Failed to create file stream: NULL opj_stream_t"));
+    }
     Ok((Self {
       stream,
       is_input,
@@ -171,11 +175,12 @@ impl<'a> Stream<'a> {
     let res = unsafe { sys::opj_read_header(self.stream, codec.as_ptr(), &mut img)};
     // Try wrapping the image pointer before handling any errors.
     // Since the read header function might have allocated the image structure.
-    let img = WrappedImage::new(img);
-    if res != 1 {
-      Err(anyhow!("Failed to read header."))?;
+    let img = WrappedImage::new(img)?;
+    if res == 1 {
+      Ok(img)
+    } else {
+      Err(Error::CodecError("Failed to read header".into()))
     }
-    img
   }
 
   pub(crate) fn decode(&self, codec: &Codec, img: &WrappedImage) -> Result<()> {
@@ -186,10 +191,10 @@ impl<'a> Stream<'a> {
       sys::opj_decode(codec.as_ptr(), self.stream, img.as_ptr()) == 1 &&
       sys::opj_end_decompress(codec.as_ptr(), self.stream) == 1
     };
-    if !res {
-      Err(anyhow!("Failed to decode image."))
-    } else {
+    if res {
       Ok(())
+    } else {
+      Err(Error::CodecError("Failed to decode image".into()))
     }
   }
 
@@ -202,10 +207,10 @@ impl<'a> Stream<'a> {
       sys::opj_encode(codec.as_ptr(), self.stream) == 1 &&
       sys::opj_end_compress(codec.as_ptr(), self.stream) == 1
     };
-    if !res {
-      Err(anyhow!("Failed to encode image."))
-    } else {
+    if res {
       Ok(())
+    } else {
+      Err(Error::CodecError("Failed to encode image".into()))
     }
   }
 }
