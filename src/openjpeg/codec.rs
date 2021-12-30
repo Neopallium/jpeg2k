@@ -122,13 +122,13 @@ impl<'a> Decoder<'a> {
     }
   }
 
-  pub(crate) fn read_header(&self) -> Result<WrappedImage> {
+  pub(crate) fn read_header(&self) -> Result<Image> {
     let mut img: *mut sys::opj_image_t = ptr::null_mut();
 
     let res = unsafe { sys::opj_read_header(self.stream.as_ptr(), self.as_ptr(), &mut img)};
     // Try wrapping the image pointer before handling any errors.
     // Since the read header function might have allocated the image structure.
-    let img = WrappedImage::new(img)?;
+    let img = Image::new(img)?;
     if res == 1 {
       Ok(img)
     } else {
@@ -136,7 +136,7 @@ impl<'a> Decoder<'a> {
     }
   }
 
-  pub(crate) fn decode(&self, img: &WrappedImage) -> Result<()> {
+  pub(crate) fn decode(&self, img: &Image) -> Result<()> {
     let res = unsafe {
       sys::opj_decode(self.as_ptr(), self.stream.as_ptr(), img.as_ptr()) == 1 &&
       sys::opj_end_decompress(self.as_ptr(), self.stream.as_ptr()) == 1
@@ -169,7 +169,7 @@ impl<'a> Encoder<'a> {
     })
   }
 
-  pub(crate) fn setup(&self, mut params: EncodeParamers, img: &WrappedImage) -> Result<()> {
+  pub(crate) fn setup(&self, mut params: EncodeParamers, img: &Image) -> Result<()> {
     let res = unsafe {
       sys::opj_setup_encoder(self.as_ptr(), &mut params.0, img.as_ptr())
     };
@@ -180,7 +180,7 @@ impl<'a> Encoder<'a> {
     }
   }
 
-  pub(crate) fn encode(&self, img: &WrappedImage) -> Result<()> {
+  pub(crate) fn encode(&self, img: &Image) -> Result<()> {
     let res = unsafe {
       sys::opj_start_compress(self.as_ptr(), img.as_ptr(), self.stream.as_ptr()) == 1 &&
       sys::opj_encode(self.as_ptr(), self.stream.as_ptr()) == 1 &&
