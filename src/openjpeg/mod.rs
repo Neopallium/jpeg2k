@@ -16,6 +16,6 @@ pub(crate) mod codec;
 pub(crate) mod image;
 
 pub(crate) use stream::*;
-pub(crate) use codec::*;
+pub use codec::*;
 
 pub use self::image::*;

@@ -67,7 +67,7 @@ impl ImageComponent {
 
 /// A Jpeg2000 Image.
 pub struct Image {
-  pub(crate) img: ptr::NonNull<sys::opj_image_t>,
+  img: ptr::NonNull<sys::opj_image_t>,
 }
 
 impl Drop for Image {
@@ -84,8 +84,8 @@ impl std::fmt::Debug for Image {
     f.debug_struct("Image")
       .field("x_offset", &self.x_offset())
       .field("y_offset", &self.y_offset())
-      .field("width", &self.width())
-      .field("height", &self.height())
+      .field("width", &self.orig_width())
+      .field("height", &self.orig_height())
       .field("color_space", &self.color_space())
       .field("numcomps", &img.numcomps)
       .field("comps", &self.components())
@@ -103,39 +103,54 @@ impl Image {
   /// Load a Jpeg 2000 image from bytes.  It will detect the J2K format.
   pub fn from_bytes(buf: &[u8]) -> Result<Self> {
     let stream = Stream::from_bytes(buf)?;
-
-    let decoder = Decoder::new(stream)?;
-    let params = DecodeParamers::default();
-    decoder.setup(params)?;
-
-    let img = decoder.read_header()?;
-
-    decoder.decode(&img)?;
-
-    Ok(img)
+    Self::from_stream(stream, Default::default())
   }
 
   /// Load a Jpeg 2000 image from file.  It will detect the J2K format.
   pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
     let stream = Stream::from_file(path)?;
+    Self::from_stream(stream, Default::default())
+  }
 
+  /// Load a Jpeg 2000 image from bytes.  It will detect the J2K format.
+  pub fn from_bytes_with(buf: &[u8], params: DecodeParameters) -> Result<Self> {
+    let stream = Stream::from_bytes(buf)?;
+    Self::from_stream(stream, params)
+  }
+
+  /// Load a Jpeg 2000 image from file.  It will detect the J2K format.
+  pub fn from_file_with<P: AsRef<Path>>(path: P, params: DecodeParameters) -> Result<Self> {
+    let stream = Stream::from_file(path)?;
+    Self::from_stream(stream, params)
+  }
+
+  /// Save image to Jpeg 2000 file.  It will detect the J2K format.
+  pub fn save_as_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    let stream = Stream::to_file(path)?;
+    self.to_stream(stream, Default::default())
+  }
+
+  /// Save image to Jpeg 2000 file.  It will detect the J2K format.
+  pub fn save_as_file_with<P: AsRef<Path>>(&self, path: P, params: EncodeParameters) -> Result<()> {
+    let stream = Stream::to_file(path)?;
+    self.to_stream(stream, params)
+  }
+
+  fn from_stream(stream: Stream<'_>, mut params: DecodeParameters) -> Result<Self> {
     let decoder = Decoder::new(stream)?;
-    let params = DecodeParamers::default();
-    decoder.setup(params)?;
+    decoder.setup(&mut params)?;
 
     let img = decoder.read_header()?;
+
+    decoder.set_decode_area(&img, &params)?;
 
     decoder.decode(&img)?;
 
     Ok(img)
   }
 
-  /// Save image to Jpeg 2000 file.  It will detect the J2K format.
-  pub fn save_as_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-    let stream = Stream::to_file(path)?;
-
+  fn to_stream(&self, stream: Stream<'_>, params: EncodeParameters) -> Result<()> {
     let encoder = Encoder::new(stream)?;
-    let params = EncodeParamers::default();
     encoder.setup(params, &self)?;
 
     encoder.encode(&self)?;
@@ -163,16 +178,28 @@ impl Image {
     img.y0
   }
 
-  /// Image width.
-  pub fn width(&self) -> u32 {
+  /// Full resolution image width.  Not reduced by the scaling factor.
+  pub fn orig_width(&self) -> u32 {
     let img = self.image();
     img.x1 - img.x0
   }
 
-  /// Image height.
-  pub fn height(&self) -> u32 {
+  /// Full resolution image height.  Not reduced by the scaling factor.
+  pub fn orig_height(&self) -> u32 {
     let img = self.image();
     img.y1 - img.y0
+  }
+
+  /// Decoded image width.  Reduced by the scaling factor.
+  pub fn width(&self) -> u32 {
+    self.component_dimensions()
+      .map(|(w,_)| w).unwrap_or_default()
+  }
+
+  /// Decoded image height.  Reduced by the scaling factor.
+  pub fn height(&self) -> u32 {
+    self.component_dimensions()
+      .map(|(_,h)| h).unwrap_or_default()
   }
 
   /// Color space.
@@ -185,6 +212,11 @@ impl Image {
   pub fn num_components(&self) -> u32 {
     let img = self.image();
     img.numcomps
+  }
+
+  fn component_dimensions(&self) -> Option<(u32, u32)> {
+    self.components().get(0)
+      .map(|comp| (comp.width(), comp.height()))
   }
 
   /// Image components.
@@ -202,10 +234,11 @@ impl TryFrom<Image> for ::image::DynamicImage {
 
   fn try_from(img: Image) -> Result<::image::DynamicImage> {
     use ::image::*;
-    let width = img.width();
-    let height = img.height();
+    let comps = img.components();
+    let (width, height) = comps.get(0).map(|c| (c.width(), c.height()))
+      .ok_or_else(|| Error::UnsupportedComponentsError(0))?;
 
-    let img = match img.components() {
+    let img = match comps {
       [r] => {
         let pixels = r.data().iter().map(|r| *r as u8).collect();
 

@@ -35,12 +35,12 @@ impl TryFrom<Image> for Texture {
 
   fn try_from(img: Image) -> Result<Texture> {
     use bevy::render::texture::*;
-    // Get ref to inner image.
-    let width = img.width();
-    let height = img.height();
+    let comps = img.components();
+    let (width, height) = comps.get(0).map(|c| (c.width(), c.height()))
+      .ok_or_else(|| Error::UnsupportedComponentsError(0))?;
     let format;
 
-    let data = match img.components() {
+    let data = match comps {
       [r] => {
         format = TextureFormat::R8Unorm;
         r.data().iter().map(|r| *r as u8).collect()
