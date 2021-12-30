@@ -59,16 +59,15 @@ pub struct Image {
 impl Image {
   /// Load a Jpeg 2000 image from bytes.  It will detect the J2K format.
   pub fn from_bytes(buf: &[u8]) -> Result<Self> {
-    let format = j2k_detect_format(buf)?;
+    let stream = Stream::from_bytes(buf)?;
 
-    let stream = Stream::from_bytes(buf);
-
+    let decoder = Decoder::new(stream)?;
     let params = DecodeParamers::default();
-    let codec = Codec::new_decompress(format, params)?;
+    decoder.setup(params)?;
 
-    let img = stream.read_header(&codec)?;
+    let img = decoder.read_header()?;
 
-    stream.decode(&codec, &img)?;
+    decoder.decode(&img)?;
 
     Ok(Self{
       img,
@@ -77,14 +76,15 @@ impl Image {
 
   /// Load a Jpeg 2000 image from file.  It will detect the J2K format.
   pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
-    let (stream, format) = Stream::from_file(path)?;
+    let stream = Stream::from_file(path)?;
 
+    let decoder = Decoder::new(stream)?;
     let params = DecodeParamers::default();
-    let codec = Codec::new_decompress(format, params)?;
+    decoder.setup(params)?;
 
-    let img = stream.read_header(&codec)?;
+    let img = decoder.read_header()?;
 
-    stream.decode(&codec, &img)?;
+    decoder.decode(&img)?;
 
     Ok(Self{
       img,
@@ -93,13 +93,13 @@ impl Image {
 
   /// Save image to Jpeg 2000 file.  It will detect the J2K format.
   pub fn save_as_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-    let (stream, format) = Stream::to_file(path)?;
+    let stream = Stream::to_file(path)?;
 
-    let codec = Codec::new_compress(format)?;
+    let encoder = Encoder::new(stream)?;
     let params = EncodeParamers::default();
-    codec.setup_encoder(params, &self.img)?;
+    encoder.setup(params, &self.img)?;
 
-    stream.encode(&codec, &self.img)?;
+    encoder.encode(&self.img)?;
 
     Ok(())
   }

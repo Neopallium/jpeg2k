@@ -2,6 +2,8 @@ use std::os::raw::{c_char, c_void};
 use std::ffi::CStr;
 use std::ptr;
 
+use log::{Level, log_enabled};
+
 use super::*;
 
 pub(crate) struct DecodeParamers(sys::opj_dparameters);
@@ -30,7 +32,6 @@ impl Default for EncodeParamers {
 
 pub(crate) struct Codec {
   codec: ptr::NonNull<sys::opj_codec_t>,
-  is_decoder: bool,
 }
 
 impl Drop for Codec {
@@ -60,61 +61,115 @@ extern "C" fn log_error(msg: *const c_char, _data: *mut c_void) {
 }
 
 impl Codec {
-  pub(crate) fn new_decompress(fmt: J2KFormat, mut params: DecodeParamers) -> Result<Self> {
+  fn new(fmt: J2KFormat, is_decoder: bool) -> Result<Self> {
     let format: sys::CODEC_FORMAT = fmt.into();
     let ptr = unsafe {
-      ptr::NonNull::new(sys::opj_create_decompress(format))
+      if is_decoder {
+        ptr::NonNull::new(sys::opj_create_decompress(format))
+      } else {
+        ptr::NonNull::new(sys::opj_create_compress(format))
+      }
     };
     if let Some(ptr) = ptr {
       let null = ptr::null_mut();
-      params.0.m_verbose = 1;
       unsafe {
-        if params.0.m_verbose != 0 {
+        if log_enabled!(Level::Info) {
           sys::opj_set_info_handler(ptr.as_ptr(), Some(log_info), null);
+        }
+        if log_enabled!(Level::Warn) {
           sys::opj_set_warning_handler(ptr.as_ptr(), Some(log_warn), null);
         }
         sys::opj_set_error_handler(ptr.as_ptr(), Some(log_error), null);
       }
 
-      let res = unsafe {
-        sys::opj_setup_decoder(ptr.as_ptr(), &mut params.0)
-      };
-      if res == 1 {
-        Ok(Self {
-          codec: ptr,
-          is_decoder: true,
-        })
-      } else {
-        Err(Error::CreateCodecError(format!("Failed to setup decoder with parameters.")))
-      }
-    } else {
-      Err(Error::CreateCodecError(format!("Codec not supported: {:?}", fmt)))
-    }
-  }
-
-  pub(crate) fn new_compress(fmt: J2KFormat) -> Result<Self> {
-    let format: sys::CODEC_FORMAT = fmt.into();
-    let ptr = unsafe {
-      ptr::NonNull::new(sys::opj_create_compress(format))
-    };
-    if let Some(ptr) = ptr {
-      let null = ptr::null_mut();
-      unsafe {
-        sys::opj_set_info_handler(ptr.as_ptr(), Some(log_info), null);
-        sys::opj_set_warning_handler(ptr.as_ptr(), Some(log_warn), null);
-        sys::opj_set_error_handler(ptr.as_ptr(), Some(log_error), null);
-      }
-
       Ok(Self {
         codec: ptr,
-        is_decoder: false,
       })
     } else {
       Err(Error::CreateCodecError(format!("Codec not supported: {:?}", fmt)))
     }
   }
 
-  pub(crate) fn setup_encoder(&self, mut params: EncodeParamers, img: &WrappedImage) -> Result<()> {
+  pub(crate) fn as_ptr(&self) -> *mut sys::opj_codec_t {
+    self.codec.as_ptr()
+  }
+}
+
+pub(crate) struct Decoder<'a> {
+  codec: Codec,
+  stream: Stream<'a>,
+}
+
+impl<'a> Decoder<'a> {
+  pub(crate) fn new(stream: Stream<'a>) -> Result<Self> {
+    assert!(stream.is_input());
+    let fmt = stream.format();
+    let codec = Codec::new(fmt, true)?;
+    Ok(Self {
+      codec,
+      stream,
+    })
+  }
+
+  pub(crate) fn setup(&self, mut params: DecodeParamers) -> Result<()> {
+    let res = unsafe {
+      sys::opj_setup_decoder(self.as_ptr(), &mut params.0)
+    };
+    if res == 1 {
+      Ok(())
+    } else {
+      Err(Error::CreateCodecError(format!("Failed to setup decoder with parameters.")))
+    }
+  }
+
+  pub(crate) fn read_header(&self) -> Result<WrappedImage> {
+    let mut img: *mut sys::opj_image_t = ptr::null_mut();
+
+    let res = unsafe { sys::opj_read_header(self.stream.as_ptr(), self.as_ptr(), &mut img)};
+    // Try wrapping the image pointer before handling any errors.
+    // Since the read header function might have allocated the image structure.
+    let img = WrappedImage::new(img)?;
+    if res == 1 {
+      Ok(img)
+    } else {
+      Err(Error::CodecError("Failed to read header".into()))
+    }
+  }
+
+  pub(crate) fn decode(&self, img: &WrappedImage) -> Result<()> {
+    let res = unsafe {
+      sys::opj_decode(self.as_ptr(), self.stream.as_ptr(), img.as_ptr()) == 1 &&
+      sys::opj_end_decompress(self.as_ptr(), self.stream.as_ptr()) == 1
+    };
+    if res {
+      Ok(())
+    } else {
+      Err(Error::CodecError("Failed to decode image".into()))
+    }
+  }
+
+  pub(crate) fn as_ptr(&self) -> *mut sys::opj_codec_t {
+    self.codec.as_ptr()
+  }
+}
+
+pub(crate) struct Encoder<'a> {
+  codec: Codec,
+  stream: Stream<'a>,
+}
+
+impl<'a> Encoder<'a> {
+  pub(crate) fn new(stream: Stream<'a>) -> Result<Self> {
+    assert!(!stream.is_input());
+    let fmt = stream.format();
+    let codec = Codec::new(fmt, false)?;
+    Ok(Self {
+      codec,
+      stream
+    })
+  }
+
+  pub(crate) fn setup(&self, mut params: EncodeParamers, img: &WrappedImage) -> Result<()> {
     let res = unsafe {
       sys::opj_setup_encoder(self.as_ptr(), &mut params.0, img.as_ptr())
     };
@@ -125,11 +180,21 @@ impl Codec {
     }
   }
 
-  pub(crate) fn is_decoder(&self) -> bool {
-    self.is_decoder
+  pub(crate) fn encode(&self, img: &WrappedImage) -> Result<()> {
+    let res = unsafe {
+      sys::opj_start_compress(self.as_ptr(), img.as_ptr(), self.stream.as_ptr()) == 1 &&
+      sys::opj_encode(self.as_ptr(), self.stream.as_ptr()) == 1 &&
+      sys::opj_end_compress(self.as_ptr(), self.stream.as_ptr()) == 1
+    };
+    if res {
+      Ok(())
+    } else {
+      Err(Error::CodecError("Failed to encode image".into()))
+    }
   }
 
   pub(crate) fn as_ptr(&self) -> *mut sys::opj_codec_t {
     self.codec.as_ptr()
   }
 }
+

@@ -1,6 +1,5 @@
 use std::ffi::CString;
 use std::os::raw::c_void;
-use std::ptr;
 
 use std::path::Path;
 
@@ -56,6 +55,7 @@ impl<'a> WrappedSlice<'a> {
 
 pub(crate) struct Stream<'a> {
   stream: *mut sys::opj_stream_t,
+  format: J2KFormat,
   is_input: bool,
   buf: Option<&'a [u8]>,
 }
@@ -112,7 +112,8 @@ extern "C" fn buf_read_stream_seek_fn(nb_bytes: i64, p_data: *mut c_void) -> i32
 }
 
 impl<'a> Stream<'a> {
-  pub(crate) fn from_bytes(buf: &'a [u8]) -> Self {
+  pub(crate) fn from_bytes(buf: &'a [u8]) -> Result<Self> {
+    let format = j2k_detect_format(buf)?;
     let len = buf.len();
     let data = WrappedSlice::new(buf);
     unsafe {
@@ -127,15 +128,16 @@ impl<'a> Stream<'a> {
         p_data,
         Some(buf_read_stream_free_fn));
 
-      Self {
+      Ok(Self {
         stream,
+        format,
         is_input: true,
         buf: Some(buf),
-      }
+      })
     }
   }
 
-  pub(crate) fn new_file<P: AsRef<Path>>(path: P, is_input: bool) -> Result<(Self, J2KFormat)> {
+  pub(crate) fn new_file<P: AsRef<Path>>(path: P, is_input: bool) -> Result<Self> {
     let path = path.as_ref();
     if !path.exists() {
       return Err(Error::FileNotFoundError(format!("{:?}", path)));
@@ -152,65 +154,31 @@ impl<'a> Stream<'a> {
     if stream.is_null() {
       return Err(Error::NullPointerError("Failed to create file stream: NULL opj_stream_t"));
     }
-    Ok((Self {
+    Ok(Self {
       stream,
+      format,
       is_input,
       buf: None,
-    }, format))
+    })
   }
 
-  pub(crate) fn from_file<P: AsRef<Path>>(path: P) -> Result<(Self, J2KFormat)> {
+  pub(crate) fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
     Self::new_file(path, true)
   }
 
-  pub(crate) fn to_file<P: AsRef<Path>>(path: P) -> Result<(Self, J2KFormat)> {
+  pub(crate) fn to_file<P: AsRef<Path>>(path: P) -> Result<Self> {
     Self::new_file(path, false)
   }
 
-  pub(crate) fn read_header(&self, codec: &Codec) -> Result<WrappedImage> {
-    assert!(self.is_input);
-    assert!(codec.is_decoder());
-    let mut img: *mut sys::opj_image_t = ptr::null_mut();
-
-    let res = unsafe { sys::opj_read_header(self.stream, codec.as_ptr(), &mut img)};
-    // Try wrapping the image pointer before handling any errors.
-    // Since the read header function might have allocated the image structure.
-    let img = WrappedImage::new(img)?;
-    if res == 1 {
-      Ok(img)
-    } else {
-      Err(Error::CodecError("Failed to read header".into()))
-    }
+  pub(crate) fn format(&self) -> J2KFormat {
+    self.format
   }
 
-  pub(crate) fn decode(&self, codec: &Codec, img: &WrappedImage) -> Result<()> {
-    assert!(self.is_input);
-    assert!(codec.is_decoder());
-
-    let res = unsafe {
-      sys::opj_decode(codec.as_ptr(), self.stream, img.as_ptr()) == 1 &&
-      sys::opj_end_decompress(codec.as_ptr(), self.stream) == 1
-    };
-    if res {
-      Ok(())
-    } else {
-      Err(Error::CodecError("Failed to decode image".into()))
-    }
+  pub(crate) fn is_input(&self) -> bool {
+    self.is_input
   }
 
-  pub(crate) fn encode(&self, codec: &Codec, img: &WrappedImage) -> Result<()> {
-    assert!(!self.is_input);
-    assert!(!codec.is_decoder());
-
-    let res = unsafe {
-      sys::opj_start_compress(codec.as_ptr(), img.as_ptr(), self.stream) == 1 &&
-      sys::opj_encode(codec.as_ptr(), self.stream) == 1 &&
-      sys::opj_end_compress(codec.as_ptr(), self.stream) == 1
-    };
-    if res {
-      Ok(())
-    } else {
-      Err(Error::CodecError("Failed to encode image".into()))
-    }
+  pub(crate) fn as_ptr(&self) -> *mut sys::opj_stream_t {
+    self.stream
   }
 }
