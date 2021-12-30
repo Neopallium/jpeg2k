@@ -8,9 +8,7 @@ mod openjpeg;
 pub use openjpeg::*;
 
 #[cfg(feature = "bevy")]
-mod bevy_loader;
-#[cfg(feature = "bevy")]
-pub use bevy_loader::*;
+pub mod loader;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ColorSpace {

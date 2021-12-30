@@ -2,7 +2,7 @@ use std::env;
 
 use bevy::prelude::*;
 
-use jpeg2k::*;
+use jpeg2k::loader::*;
 
 fn main() {
   dotenv::dotenv().ok();
