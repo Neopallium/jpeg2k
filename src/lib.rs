@@ -1,3 +1,8 @@
+//! # Jpeg 2000 image support.
+//!
+//! A safe wrapper of `openjpeg-sys` for loading/saving Jpeg 2000 images.
+
+/// File format detection.
 pub mod format;
 pub(crate) use format::*;
 
@@ -10,6 +15,7 @@ pub use openjpeg::*;
 #[cfg(feature = "bevy")]
 pub mod loader;
 
+/// Image color space.
 #[derive(Debug, Clone, Copy)]
 pub enum ColorSpace {
   Unknown,

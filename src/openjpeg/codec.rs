@@ -6,6 +6,18 @@ use log::{Level, log_enabled};
 
 use super::*;
 
+/// The area of the source image to decode.
+///
+/// This is useful for loading a small part of a
+/// very large image.
+///
+/// ```rust
+/// let area = DecodeArea::new(10, 10, 200, 200);
+///
+/// // or from a string:
+/// let area: DecodeArea = "10:10:200:200".parse()?;
+/// let area = DecodeArea::from_str("10:10:200:200")?;
+/// ```
 #[derive(Default, Clone, Copy)]
 pub struct DecodeArea {
   start_x: u32,
@@ -62,16 +74,30 @@ impl DecodeParameters {
     Default::default()
   }
 
+  /// How much to reduce the image's resolution.
+  ///
+  /// If `reduce == 0`, image is decoded to the full resolution.  This is the default.
+  /// If `reduce > 0`, then original dimension divided by 2^(reduce)
   pub fn reduce(mut self, reduce: u32) -> Self {
     self.params.cp_reduce = reduce;
     self
   }
 
+  /// The number of quality layers to decode.
+  ///
+  /// If there are less quality layers than the specified number,
+  /// all the quality layers are decoded.
+  /// 
+  /// If `layers == 0`, all the quality layers are decoded.  This is the default.
+  /// If `layers > 0`, then only the first `layers` layers are decoded.
   pub fn layers(mut self, layers: u32) -> Self {
     self.params.cp_layer = layers;
     self
   }
 
+  /// The area to decode.
+  ///
+  /// If `area == None`, then the whole image will be decoded.  This is the defult.
   pub fn decode_area(mut self, area: Option<DecodeArea>) -> Self {
     self.area = area;
     self

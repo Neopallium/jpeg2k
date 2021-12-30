@@ -1,36 +1,24 @@
 # jpeg2k
+
 Safe wrapper for `openjpeg-sys` with Bevy asset support.
 
-## Example: Bevy asset loader
+## Example: Convert a Jpeg 2000 image to a png image.
 
 ```rust
-use std::env;
-
-use anyhow::Result;
-
 use image::DynamicImage;
 
 use jpeg2k::*;
 
-fn main() -> Result<()> {
-  let jp2_filename = env::args().nth(1)
-    .unwrap_or_else(|| "test.j2k".to_string());
-  let savename = env::args().nth(2)
-    .unwrap_or_else(|| "test.jpg".to_string());
-
+fn main() {
   // Load jpeg 2000 file from file.
-  let jp2_image = Image::from_file(jp2_filename)?;
-
-  println!("jp2_image: width={:?}, height={:?}", jp2_image.width(), jp2_image.height());
+  let jp2_image = Image::from_file("./assets/example.j2k")
+		.expect("Failed to load j2k file.");
 
   // Convert to a `image::DynamicImage`
   let img: DynamicImage = jp2_image.try_into()?;
 
-  // Using `image` crate to save image to another format: png, jpg, etc...
-  img.save(&savename)?;
-
-  println!("Saved to: {}", savename);
-  Ok(())
+  // Save as png file.
+  img.save("out.png")?;
 }
 ```
 
@@ -39,7 +27,7 @@ fn main() -> Result<()> {
 ```rust
 use bevy::prelude::*;
 
-use jpeg2k::*;
+use jpeg2k::loader::*;
 
 fn main() {
   App::build()
