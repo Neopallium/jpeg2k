@@ -28,7 +28,38 @@ impl std::fmt::Debug for ImageComponent {
 }
 
 impl ImageComponent {
-  pub(crate) fn data(&self) -> &[i32] {
+  /// Component width.
+  pub fn width(&self) -> u32 {
+    self.0.w
+  }
+
+  /// Component height.
+  pub fn height(&self) -> u32 {
+    self.0.h
+  }
+
+  /// Component precision.
+  pub fn precision(&self) -> u32 {
+    self.0.prec
+  }
+
+  /// Image depth in bits.
+  pub fn bpp(&self) -> u32 {
+    self.0.bpp
+  }
+
+  /// Is component an alpha channel.
+  pub fn is_alpha(&self) -> bool {
+    self.0.alpha == 1
+  }
+
+  /// Is component data signed.
+  pub fn is_signed(&self) -> bool {
+    self.0.sgnd == 1
+  }
+
+  /// Component data.
+  pub fn data(&self) -> &[i32] {
     let len = (self.0.w * self.0.h) as usize;
     unsafe { std::slice::from_raw_parts(self.0.data, len) }
   }
@@ -156,7 +187,8 @@ impl Image {
     img.numcomps
   }
 
-  pub(crate) fn components(&self) -> &[ImageComponent] {
+  /// Image components.
+  pub fn components(&self) -> &[ImageComponent] {
     let img = self.image();
     let numcomps = img.numcomps;
     unsafe { std::slice::from_raw_parts(img.comps as *mut ImageComponent, numcomps as usize) }
