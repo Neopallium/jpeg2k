@@ -1,10 +1,10 @@
 [package]
 name = "jpeg2k"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["Robert G. Jakabosky <rjakabosky+neopallium@neoawareness.com>"]
 edition = "2021"
 license = "MIT/Apache-2.0"
-description = "Safe wrapper for openjpeg-sys with Bevy asset support."
+description = "JPEG 2000 image loader."
 keywords = ["j2k", "jp2", "jpeg2000", "bevy", "image"]
 repository = "https://github.com/Neopallium/jpeg2k"
 homepage = "https://github.com/Neopallium/jpeg2k"

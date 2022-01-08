@@ -1,6 +1,6 @@
 # jpeg2k
 
-Safe wrapper for `openjpeg-sys` with Bevy asset support.
+JPEG 2000 image loader.
 
 ## Example: Convert a Jpeg 2000 image to a png image.
 
