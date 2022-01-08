@@ -170,6 +170,14 @@ impl Codec {
           sys::opj_set_warning_handler(ptr.as_ptr(), Some(log_warn), null);
         }
         sys::opj_set_error_handler(ptr.as_ptr(), Some(log_error), null);
+
+        #[cfg(feature = "threads")]
+        if sys::opj_has_thread_support() == 1{
+          let num_cpus = sys::opj_get_num_cpus();
+          if sys::opj_codec_set_threads(ptr.as_ptr(), num_cpus) != 1 {
+            log::warn!("Failed to set number of threads: {:?}", num_cpus);
+          }
+        }
       }
 
       Ok(Self {
