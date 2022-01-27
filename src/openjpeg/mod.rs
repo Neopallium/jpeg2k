@@ -14,8 +14,10 @@ impl From<J2KFormat> for sys::CODEC_FORMAT {
 pub(crate) mod stream;
 pub(crate) mod codec;
 pub(crate) mod image;
+pub(crate) mod dump;
 
 pub(crate) use stream::*;
 pub use codec::*;
+pub use dump::*;
 
 pub use self::image::*;

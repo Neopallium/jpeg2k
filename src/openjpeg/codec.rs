@@ -120,6 +120,217 @@ impl Default for EncodeParameters {
   }
 }
 
+pub struct CodestreamTilePartIndex(pub(crate) sys::opj_tp_index_t);
+
+impl std::fmt::Debug for CodestreamTilePartIndex {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("CodestreamTilePartIndex")
+      .field("start_pos", &self.0.start_pos)
+      .field("end_header", &self.0.end_header)
+      .field("end_pos", &self.0.end_pos)
+      .finish()
+  }
+}
+
+pub struct CodestreamPacketInfo(pub(crate) sys::opj_packet_info_t);
+
+impl std::fmt::Debug for CodestreamPacketInfo {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("CodestreamPacketInfo")
+      .field("start_pos", &self.0.start_pos)
+      .field("end_ph_pos", &self.0.end_ph_pos)
+      .field("end_pos", &self.0.end_pos)
+      .field("disto", &self.0.disto)
+      .finish()
+  }
+}
+
+pub struct CodestreamMarker(pub(crate) sys::opj_marker_info_t);
+
+impl std::fmt::Debug for CodestreamMarker {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("CodestreamMarker")
+      .field("type", &self.0.type_)
+      .field("pos", &self.0.pos)
+      .field("len", &self.0.len)
+      .finish()
+  }
+}
+
+pub struct TileCodingParamInfo(ptr::NonNull<sys::opj_tccp_info_t>);
+
+impl std::fmt::Debug for TileCodingParamInfo {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let info = self.as_ref();
+    f.debug_struct("TileCodingParamInfo")
+      .field("compno", &info.compno)
+      .field("csty", &info.csty)
+      .field("numresolutions", &info.numresolutions)
+      .field("cblkw", &info.cblkw)
+      .field("cblkh", &info.cblkh)
+      .field("cblksty", &info.cblksty)
+      .field("qmfbid", &info.qmfbid)
+      .field("qntsty", &info.qntsty)
+      .field("stepsizes_mant", &info.stepsizes_mant)
+      .field("stepsizes_expn", &info.stepsizes_expn)
+      .field("numgbits", &info.numgbits)
+      .field("roishift", &info.roishift)
+      .field("prcw", &info.prcw)
+      .field("prch", &info.prch)
+      .finish()
+  }
+}
+
+impl TileCodingParamInfo {
+  fn as_ref(&self) -> &sys::opj_tccp_info_t {
+    unsafe { &(*self.0.as_ref()) }
+  }
+}
+
+pub struct TileInfo(pub(crate) sys::opj_tile_info_v2_t);
+
+impl std::fmt::Debug for TileInfo {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("TileInfo")
+      .field("tileno", &self.0.tileno)
+      .field("csty", &self.0.csty)
+      .field("prg", &self.0.prg)
+      .field("numlayers", &self.0.numlayers)
+      .field("mct", &self.0.mct)
+      .field("tccp_info", &self.tccp_info())
+      .finish()
+  }
+}
+
+impl TileInfo {
+  fn tccp_info(&self) -> Option<TileCodingParamInfo> {
+    ptr::NonNull::new(self.0.tccp_info)
+      .map(|info| TileCodingParamInfo(info))
+  }
+}
+
+pub struct CodestreamTileIndex(pub(crate) sys::opj_tile_index_t);
+
+impl std::fmt::Debug for CodestreamTileIndex {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("CodestreamTileIndex")
+      .field("tileno", &self.0.tileno)
+      .field("nb_tps", &self.0.nb_tps)
+      .field("current_nb_tps", &self.0.current_nb_tps)
+      .field("current_tpsno", &self.0.current_tpsno)
+      .field("tp_index", &self.tile_parts())
+      .field("marknum", &self.0.marknum)
+      .field("marker", &self.markers())
+      .field("maxmarknum", &self.0.maxmarknum)
+      .field("nb_packet", &self.0.nb_packet)
+      .field("packet_info", &self.packets())
+      .finish()
+  }
+}
+
+impl CodestreamTileIndex {
+  /// Tile part index.
+  pub fn tile_parts(&self) -> &[CodestreamTilePartIndex] {
+    let num = self.0.nb_tps;
+    unsafe { std::slice::from_raw_parts(self.0.tp_index as *mut CodestreamTilePartIndex, num as usize) }
+  }
+
+  /// Tile markers.
+  pub fn markers(&self) -> &[CodestreamMarker] {
+    let num = self.0.marknum;
+    unsafe { std::slice::from_raw_parts(self.0.marker as *mut CodestreamMarker, num as usize) }
+  }
+
+  /// Codestream packet info.
+  pub fn packets(&self) -> &[CodestreamPacketInfo] {
+    let num = self.0.nb_packet;
+    unsafe { std::slice::from_raw_parts(self.0.packet_index as *mut CodestreamPacketInfo, num as usize) }
+  }
+}
+
+pub struct CodestreamIndex(ptr::NonNull<sys::opj_codestream_index_t>);
+
+impl Drop for CodestreamIndex {
+  fn drop(&mut self) {
+    unsafe {
+      sys::opj_destroy_cstr_index(&mut self.0.as_ptr());
+    }
+  }
+}
+
+impl std::fmt::Debug for CodestreamIndex {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let idx = self.as_ref();
+    f.debug_struct("CodestreamIndex")
+      .field("main_head_start", &idx.main_head_start)
+      .field("main_head_end", &idx.main_head_end)
+      .field("codestream_size", &idx.codestream_size)
+      .field("marknum", &idx.marknum)
+      .field("marker", &self.markers())
+      .field("maxmarknum", &idx.maxmarknum)
+      .field("nb_of_tiles", &idx.nb_of_tiles)
+      .field("tile_index", &self.tile_indices())
+      .finish()
+  }
+}
+
+impl CodestreamIndex {
+  fn as_ref(&self) -> &sys::opj_codestream_index_t {
+    unsafe { &(*self.0.as_ref()) }
+  }
+
+  /// Codestream markers.
+  pub fn markers(&self) -> &[CodestreamMarker] {
+    let idx = self.as_ref();
+    let num = idx.marknum;
+    unsafe { std::slice::from_raw_parts(idx.marker as *mut CodestreamMarker, num as usize) }
+  }
+
+  /// Codestream tile indices.
+  pub fn tile_indices(&self) -> &[CodestreamTileIndex] {
+    let idx = self.as_ref();
+    let num = idx.nb_of_tiles;
+    unsafe { std::slice::from_raw_parts(idx.tile_index as *mut CodestreamTileIndex, num as usize) }
+  }
+}
+
+pub struct CodestreamInfo(ptr::NonNull<sys::opj_codestream_info_v2_t>);
+
+impl Drop for CodestreamInfo {
+  fn drop(&mut self) {
+    unsafe {
+      sys::opj_destroy_cstr_info(&mut self.0.as_ptr());
+    }
+  }
+}
+
+impl std::fmt::Debug for CodestreamInfo {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let info = self.as_ref();
+    let tile_info = if info.tile_info.is_null() {
+      TileInfo(info.m_default_tile_info)
+    } else {
+      TileInfo(unsafe { *info.tile_info })
+    };
+    f.debug_struct("CodestreamInfo")
+      .field("tx0", &info.tx0)
+      .field("ty0", &info.ty0)
+      .field("tdx", &info.tdx)
+      .field("tdy", &info.tdy)
+      .field("tw", &info.tw)
+      .field("th", &info.th)
+      .field("nbcomps", &info.nbcomps)
+      .field("tile_info", &tile_info)
+      .finish()
+  }
+}
+
+impl CodestreamInfo {
+  fn as_ref(&self) -> &sys::opj_codestream_info_v2_t {
+    unsafe { &(*self.0.as_ref()) }
+  }
+}
+
 pub(crate) struct Codec {
   codec: ptr::NonNull<sys::opj_codec_t>,
 }
@@ -234,6 +445,20 @@ impl<'a> Decoder<'a> {
     }
   }
 
+  pub(crate) fn get_codestream_index(&self) -> Result<CodestreamIndex> {
+    let index = ptr::NonNull::new(unsafe {
+      sys::opj_get_cstr_index(self.as_ptr())
+    }).ok_or_else(|| Error::CodecError("Failed to get codestream index".into()))?;
+    Ok(CodestreamIndex(index))
+  }
+
+  pub(crate) fn get_codestream_info(&self) -> Result<CodestreamInfo> {
+    let info = ptr::NonNull::new(unsafe {
+      sys::opj_get_cstr_info(self.as_ptr())
+    }).ok_or_else(|| Error::CodecError("Failed to get codestream info".into()))?;
+    Ok(CodestreamInfo(info))
+  }
+
   pub(crate) fn set_decode_area(&self, img: &Image, params: &DecodeParameters) -> Result<()> {
     if let Some(area) = &params.area {
       let res = unsafe {
@@ -248,6 +473,17 @@ impl<'a> Decoder<'a> {
       }
     }
     Ok(())
+  }
+
+  pub(crate) fn start_decode(&self, img: &Image) -> Result<()> {
+    let res = unsafe {
+      sys::opj_decode(self.as_ptr(), self.stream.as_ptr(), img.as_ptr()) == 1
+    };
+    if res {
+      Ok(())
+    } else {
+      Err(Error::CodecError("Failed to start decode image".into()))
+    }
   }
 
   pub(crate) fn decode(&self, img: &Image) -> Result<()> {
