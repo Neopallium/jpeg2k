@@ -38,10 +38,7 @@ impl<'a> DumpImage<'a> {
 
     let img = decoder.read_header()?;
 
-    Ok(Self {
-      decoder,
-      img
-    })
+    Ok(Self { decoder, img })
   }
 
   pub fn decode(&self) -> Result<()> {

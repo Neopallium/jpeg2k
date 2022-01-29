@@ -8,20 +8,20 @@ fn main() -> Result<()> {
   dotenv::dotenv().ok();
   env_logger::init();
 
-  let jp2_filename = env::args().nth(1)
-    .unwrap_or_else(|| "test.j2k".to_string());
-  let reduce = env::args().nth(2)
+  let jp2_filename = env::args().nth(1).unwrap_or_else(|| "test.j2k".to_string());
+  let reduce = env::args()
+    .nth(2)
     .unwrap_or_else(|| "0".to_string())
-    .parse::<u32>().expect("Reduce must be an integer.");
-  let layers = env::args().nth(3)
+    .parse::<u32>()
+    .expect("Reduce must be an integer.");
+  let layers = env::args()
+    .nth(3)
     .unwrap_or_else(|| "0".to_string())
-    .parse::<u32>().expect("Layers must be an integer.");
+    .parse::<u32>()
+    .expect("Layers must be an integer.");
 
   // Decode parameters.
-  let params = DecodeParameters::new()
-    .reduce(reduce)
-    .layers(layers)
-    ;
+  let params = DecodeParameters::new().reduce(reduce).layers(layers);
 
   /*
   let mut file = File::open(jp2_filename)?;

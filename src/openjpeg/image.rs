@@ -95,9 +95,9 @@ impl std::fmt::Debug for Image {
 
 impl Image {
   pub(crate) fn new(ptr: *mut sys::opj_image_t) -> Result<Self> {
-    let img = ptr::NonNull::new(ptr)
-      .ok_or_else(|| Error::NullPointerError("Image: NULL `opj_image_t`"))?;
-    Ok(Self{ img })
+    let img =
+      ptr::NonNull::new(ptr).ok_or_else(|| Error::NullPointerError("Image: NULL `opj_image_t`"))?;
+    Ok(Self { img })
   }
 
   /// Load a Jpeg 2000 image from bytes.  It will detect the J2K format.
@@ -192,14 +192,18 @@ impl Image {
 
   /// Decoded image width.  Reduced by the scaling factor.
   pub fn width(&self) -> u32 {
-    self.component_dimensions()
-      .map(|(w,_)| w).unwrap_or_default()
+    self
+      .component_dimensions()
+      .map(|(w, _)| w)
+      .unwrap_or_default()
   }
 
   /// Decoded image height.  Reduced by the scaling factor.
   pub fn height(&self) -> u32 {
-    self.component_dimensions()
-      .map(|(_,h)| h).unwrap_or_default()
+    self
+      .component_dimensions()
+      .map(|(_, h)| h)
+      .unwrap_or_default()
   }
 
   /// Color space.
@@ -215,7 +219,9 @@ impl Image {
   }
 
   fn component_dimensions(&self) -> Option<(u32, u32)> {
-    self.components().get(0)
+    self
+      .components()
+      .get(0)
       .map(|comp| (comp.width(), comp.height()))
   }
 
@@ -235,7 +241,9 @@ impl TryFrom<Image> for ::image::DynamicImage {
   fn try_from(img: Image) -> Result<::image::DynamicImage> {
     use ::image::*;
     let comps = img.components();
-    let (width, height) = comps.get(0).map(|c| (c.width(), c.height()))
+    let (width, height) = comps
+      .get(0)
+      .map(|c| (c.width(), c.height()))
       .ok_or_else(|| Error::UnsupportedComponentsError(0))?;
 
     let img = match comps {
@@ -263,7 +271,11 @@ impl TryFrom<Image> for ::image::DynamicImage {
         let len = (width * height) as usize;
         let mut pixels = Vec::with_capacity(len * 4);
 
-        for (r, (g, (b, a))) in r.data().iter().zip(g.data().iter().zip(b.data().iter().zip(a.data().iter()))) {
+        for (r, (g, (b, a))) in r
+          .data()
+          .iter()
+          .zip(g.data().iter().zip(b.data().iter().zip(a.data().iter())))
+        {
           pixels.extend_from_slice(&[*r as u8, *g as u8, *b as u8, *a as u8]);
         }
         let rgba = RgbaImage::from_vec(width, height, pixels)

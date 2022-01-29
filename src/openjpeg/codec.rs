@@ -1,8 +1,8 @@
-use std::os::raw::{c_char, c_void};
 use std::ffi::CStr;
+use std::os::raw::{c_char, c_void};
 use std::ptr;
 
-use log::{Level, log_enabled};
+use log::{log_enabled, Level};
 
 use super::*;
 
@@ -29,7 +29,8 @@ pub struct DecodeArea {
 impl std::str::FromStr for DecodeArea {
   type Err = anyhow::Error;
   fn from_str(s: &str) -> Result<Self, Self::Err> {
-    let dim = s.splitn(4, ":")
+    let dim = s
+      .splitn(4, ":")
       .map(|v| v.parse::<u32>())
       .collect::<Result<Vec<u32>, _>>()?;
     Ok(Self {
@@ -44,8 +45,10 @@ impl std::str::FromStr for DecodeArea {
 impl DecodeArea {
   pub fn new(start_x: u32, start_y: u32, end_x: u32, end_y: u32) -> Self {
     Self {
-      start_x, start_y,
-      end_x, end_y,
+      start_x,
+      start_y,
+      end_x,
+      end_y,
     }
   }
 }
@@ -98,7 +101,7 @@ impl DecodeParameters {
   ///
   /// If there are less quality layers than the specified number,
   /// all the quality layers are decoded.
-  /// 
+  ///
   /// If `layers == 0`, all the quality layers are decoded.  This is the default.
   /// If `layers > 0`, then only the first `layers` layers are decoded.
   pub fn layers(mut self, layers: u32) -> Self {
@@ -215,8 +218,7 @@ impl std::fmt::Debug for TileInfo {
 
 impl TileInfo {
   fn tccp_info(&self) -> Option<TileCodingParamInfo> {
-    ptr::NonNull::new(self.0.tccp_info)
-      .map(|info| TileCodingParamInfo(info))
+    ptr::NonNull::new(self.0.tccp_info).map(|info| TileCodingParamInfo(info))
   }
 }
 
@@ -243,7 +245,12 @@ impl CodestreamTileIndex {
   /// Tile part index.
   pub fn tile_parts(&self) -> &[CodestreamTilePartIndex] {
     let num = self.0.nb_tps;
-    unsafe { std::slice::from_raw_parts(self.0.tp_index as *mut CodestreamTilePartIndex, num as usize) }
+    unsafe {
+      std::slice::from_raw_parts(
+        self.0.tp_index as *mut CodestreamTilePartIndex,
+        num as usize,
+      )
+    }
   }
 
   /// Tile markers.
@@ -255,7 +262,12 @@ impl CodestreamTileIndex {
   /// Codestream packet info.
   pub fn packets(&self) -> &[CodestreamPacketInfo] {
     let num = self.0.nb_packet;
-    unsafe { std::slice::from_raw_parts(self.0.packet_index as *mut CodestreamPacketInfo, num as usize) }
+    unsafe {
+      std::slice::from_raw_parts(
+        self.0.packet_index as *mut CodestreamPacketInfo,
+        num as usize,
+      )
+    }
   }
 }
 
@@ -394,7 +406,7 @@ impl Codec {
         sys::opj_set_error_handler(ptr.as_ptr(), Some(log_error), null);
 
         #[cfg(feature = "threads")]
-        if sys::opj_has_thread_support() == 1{
+        if sys::opj_has_thread_support() == 1 {
           let num_cpus = sys::opj_get_num_cpus();
           if sys::opj_codec_set_threads(ptr.as_ptr(), num_cpus) != 1 {
             log::warn!("Failed to set number of threads: {:?}", num_cpus);
@@ -402,11 +414,12 @@ impl Codec {
         }
       }
 
-      Ok(Self {
-        codec: ptr,
-      })
+      Ok(Self { codec: ptr })
     } else {
-      Err(Error::CreateCodecError(format!("Codec not supported: {:?}", fmt)))
+      Err(Error::CreateCodecError(format!(
+        "Codec not supported: {:?}",
+        fmt
+      )))
     }
   }
 
@@ -425,10 +438,7 @@ impl<'a> Decoder<'a> {
     assert!(stream.is_input());
     let fmt = stream.format();
     let codec = Codec::new(fmt, true)?;
-    Ok(Self {
-      codec,
-      stream,
-    })
+    Ok(Self { codec, stream })
   }
 
   pub(crate) fn setup(&self, params: &mut DecodeParameters) -> Result<()> {
@@ -439,14 +449,16 @@ impl<'a> Decoder<'a> {
     if res {
       Ok(())
     } else {
-      Err(Error::CreateCodecError(format!("Failed to setup decoder with parameters.")))
+      Err(Error::CreateCodecError(format!(
+        "Failed to setup decoder with parameters."
+      )))
     }
   }
 
   pub(crate) fn read_header(&self) -> Result<Image> {
     let mut img: *mut sys::opj_image_t = ptr::null_mut();
 
-    let res = unsafe { sys::opj_read_header(self.stream.as_ptr(), self.as_ptr(), &mut img)};
+    let res = unsafe { sys::opj_read_header(self.stream.as_ptr(), self.as_ptr(), &mut img) };
     // Try wrapping the image pointer before handling any errors.
     // Since the read header function might have allocated the image structure.
     let img = Image::new(img)?;
@@ -458,30 +470,33 @@ impl<'a> Decoder<'a> {
   }
 
   pub(crate) fn get_codestream_index(&self) -> Result<CodestreamIndex> {
-    let index = ptr::NonNull::new(unsafe {
-      sys::opj_get_cstr_index(self.as_ptr())
-    }).ok_or_else(|| Error::CodecError("Failed to get codestream index".into()))?;
+    let index = ptr::NonNull::new(unsafe { sys::opj_get_cstr_index(self.as_ptr()) })
+      .ok_or_else(|| Error::CodecError("Failed to get codestream index".into()))?;
     Ok(CodestreamIndex(index))
   }
 
   pub(crate) fn get_codestream_info(&self) -> Result<CodestreamInfo> {
-    let info = ptr::NonNull::new(unsafe {
-      sys::opj_get_cstr_info(self.as_ptr())
-    }).ok_or_else(|| Error::CodecError("Failed to get codestream info".into()))?;
+    let info = ptr::NonNull::new(unsafe { sys::opj_get_cstr_info(self.as_ptr()) })
+      .ok_or_else(|| Error::CodecError("Failed to get codestream info".into()))?;
     Ok(CodestreamInfo(info))
   }
 
   pub(crate) fn set_decode_area(&self, img: &Image, params: &DecodeParameters) -> Result<()> {
     if let Some(area) = &params.area {
       let res = unsafe {
-        sys::opj_set_decode_area(self.as_ptr(), img.as_ptr(),
+        sys::opj_set_decode_area(
+          self.as_ptr(),
+          img.as_ptr(),
           area.start_x as i32,
           area.start_y as i32,
           area.end_x as i32,
-          area.end_y as i32)
+          area.end_y as i32,
+        )
       };
       if res != 1 {
-        return Err(Error::CreateCodecError(format!("Failed to set decode area.")));
+        return Err(Error::CreateCodecError(format!(
+          "Failed to set decode area."
+        )));
       }
     }
     Ok(())
@@ -489,8 +504,8 @@ impl<'a> Decoder<'a> {
 
   pub(crate) fn decode(&self, img: &Image) -> Result<()> {
     let res = unsafe {
-      sys::opj_decode(self.as_ptr(), self.stream.as_ptr(), img.as_ptr()) == 1 &&
-      sys::opj_end_decompress(self.as_ptr(), self.stream.as_ptr()) == 1
+      sys::opj_decode(self.as_ptr(), self.stream.as_ptr(), img.as_ptr()) == 1
+        && sys::opj_end_decompress(self.as_ptr(), self.stream.as_ptr()) == 1
     };
     if res {
       Ok(())
@@ -514,28 +529,25 @@ impl<'a> Encoder<'a> {
     assert!(!stream.is_input());
     let fmt = stream.format();
     let codec = Codec::new(fmt, false)?;
-    Ok(Self {
-      codec,
-      stream
-    })
+    Ok(Self { codec, stream })
   }
 
   pub(crate) fn setup(&self, mut params: EncodeParameters, img: &Image) -> Result<()> {
-    let res = unsafe {
-      sys::opj_setup_encoder(self.as_ptr(), &mut params.0, img.as_ptr())
-    };
+    let res = unsafe { sys::opj_setup_encoder(self.as_ptr(), &mut params.0, img.as_ptr()) };
     if res == 1 {
       Ok(())
     } else {
-      Err(Error::CreateCodecError(format!("Failed to setup encoder with parameters.")))
+      Err(Error::CreateCodecError(format!(
+        "Failed to setup encoder with parameters."
+      )))
     }
   }
 
   pub(crate) fn encode(&self, img: &Image) -> Result<()> {
     let res = unsafe {
-      sys::opj_start_compress(self.as_ptr(), img.as_ptr(), self.stream.as_ptr()) == 1 &&
-      sys::opj_encode(self.as_ptr(), self.stream.as_ptr()) == 1 &&
-      sys::opj_end_compress(self.as_ptr(), self.stream.as_ptr()) == 1
+      sys::opj_start_compress(self.as_ptr(), img.as_ptr(), self.stream.as_ptr()) == 1
+        && sys::opj_encode(self.as_ptr(), self.stream.as_ptr()) == 1
+        && sys::opj_end_compress(self.as_ptr(), self.stream.as_ptr()) == 1
     };
     if res {
       Ok(())
@@ -548,4 +560,3 @@ impl<'a> Encoder<'a> {
     self.codec.as_ptr()
   }
 }
-

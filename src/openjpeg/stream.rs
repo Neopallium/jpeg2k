@@ -12,10 +12,7 @@ struct WrappedSlice<'a> {
 
 impl<'a> WrappedSlice<'a> {
   fn new(buf: &'a [u8]) -> Box<Self> {
-    Box::new(Self {
-      offset: 0,
-      buf,
-    })
+    Box::new(Self { offset: 0, buf })
   }
 
   fn remaining(&self) -> usize {
@@ -80,20 +77,20 @@ impl std::fmt::Debug for Stream<'_> {
 
 extern "C" fn buf_read_stream_free_fn(p_data: *mut c_void) {
   let ptr = p_data as *mut WrappedSlice;
-  drop(unsafe {
-    Box::from_raw(ptr)
-  })
+  drop(unsafe { Box::from_raw(ptr) })
 }
 
-extern "C" fn buf_read_stream_read_fn(p_buffer: *mut c_void, nb_bytes: usize, p_data: *mut c_void) -> usize {
+extern "C" fn buf_read_stream_read_fn(
+  p_buffer: *mut c_void,
+  nb_bytes: usize,
+  p_data: *mut c_void,
+) -> usize {
   if p_buffer.is_null() || nb_bytes == 0 {
     return 0;
   }
 
   let slice = unsafe { &mut *(p_data as *mut WrappedSlice) };
-  let out_buf = unsafe {
-    std::slice::from_raw_parts_mut(p_buffer as *mut u8, nb_bytes)
-  };
+  let out_buf = unsafe { std::slice::from_raw_parts_mut(p_buffer as *mut u8, nb_bytes) };
   slice.read_into(out_buf)
 }
 
@@ -108,7 +105,11 @@ extern "C" fn buf_read_stream_seek_fn(nb_bytes: i64, p_data: *mut c_void) -> i32
   let new_offset = slice.seek(seek_offset);
 
   // Return true if the seek worked.
-  if seek_offset == new_offset { 1 } else { 0 }
+  if seek_offset == new_offset {
+    1
+  } else {
+    0
+  }
 }
 
 impl<'a> Stream<'a> {
@@ -123,10 +124,7 @@ impl<'a> Stream<'a> {
       sys::opj_stream_set_skip_function(stream, Some(buf_read_stream_skip_fn));
       sys::opj_stream_set_seek_function(stream, Some(buf_read_stream_seek_fn));
       sys::opj_stream_set_user_data_length(stream, len as u64);
-      sys::opj_stream_set_user_data(
-        stream,
-        p_data,
-        Some(buf_read_stream_free_fn));
+      sys::opj_stream_set_user_data(stream, p_data, Some(buf_read_stream_free_fn));
 
       Ok(Self {
         stream,
@@ -143,16 +141,19 @@ impl<'a> Stream<'a> {
       return Err(Error::FileNotFoundError(format!("{:?}", path)));
     }
     let format = j2k_detect_format_from_extension(path.extension())?;
-    let c_path = path.to_str()
+    let c_path = path
+      .to_str()
       .and_then(|p| CString::new(p.as_bytes()).ok())
-      .ok_or_else(|| Error::BadFilenameError(format!("Can't pass filename to openjpeg-sys: {:?}", path)))?;
+      .ok_or_else(|| {
+        Error::BadFilenameError(format!("Can't pass filename to openjpeg-sys: {:?}", path))
+      })?;
 
     let c_input = if is_input { 1 } else { 0 };
-    let stream = unsafe {
-      sys::opj_stream_create_default_file_stream(c_path.as_ptr(), c_input)
-    };
+    let stream = unsafe { sys::opj_stream_create_default_file_stream(c_path.as_ptr(), c_input) };
     if stream.is_null() {
-      return Err(Error::NullPointerError("Failed to create file stream: NULL opj_stream_t"));
+      return Err(Error::NullPointerError(
+        "Failed to create file stream: NULL opj_stream_t",
+      ));
     }
     Ok(Self {
       stream,
