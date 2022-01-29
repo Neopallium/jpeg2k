@@ -37,8 +37,8 @@ fn main() -> Result<()> {
   println!("dump info: {:#?}", jp2_image.get_codestream_info());
 
   // Start decoding the image.  Decoding needs to be started to get
-  // the codestream index, even if `start_decode()` returns an error.
-  let res = jp2_image.start_decode();
+  // the codestream index, even if `decode()` returns an error.
+  let res = jp2_image.decode();
   println!("image decoded = {:?}", res);
 
   println!("dump index: {:#?}", jp2_image.get_codestream_index());

@@ -53,6 +53,7 @@ impl DecodeArea {
 pub struct DecodeParameters {
   params: sys::opj_dparameters,
   area: Option<DecodeArea>,
+  strict: bool,
 }
 
 impl Default for DecodeParameters {
@@ -65,6 +66,7 @@ impl Default for DecodeParameters {
     Self {
       params,
       area: Default::default(),
+      strict: false,
     }
   }
 }
@@ -80,6 +82,15 @@ impl DecodeParameters {
   /// If `reduce > 0`, then original dimension divided by 2^(reduce)
   pub fn reduce(mut self, reduce: u32) -> Self {
     self.params.cp_reduce = reduce;
+    self
+  }
+
+  /// Enable/disable strict decoing mode.
+  ///
+  /// If disabled then progressive downloading is supported (truncated codestreams).  This is the default.
+  /// If enabled then partial/truncated codestreams will return an error.
+  pub fn strict(mut self, strict: bool) -> Self {
+    self.strict = strict;
     self
   }
 
@@ -422,9 +433,10 @@ impl<'a> Decoder<'a> {
 
   pub(crate) fn setup(&self, params: &mut DecodeParameters) -> Result<()> {
     let res = unsafe {
-      sys::opj_setup_decoder(self.as_ptr(), params.as_ptr())
+      sys::opj_setup_decoder(self.as_ptr(), params.as_ptr()) == 1
+        && sys::opj_decoder_set_strict_mode(self.as_ptr(), params.strict as i32) == 1
     };
-    if res == 1 {
+    if res {
       Ok(())
     } else {
       Err(Error::CreateCodecError(format!("Failed to setup decoder with parameters.")))
@@ -473,17 +485,6 @@ impl<'a> Decoder<'a> {
       }
     }
     Ok(())
-  }
-
-  pub(crate) fn start_decode(&self, img: &Image) -> Result<()> {
-    let res = unsafe {
-      sys::opj_decode(self.as_ptr(), self.stream.as_ptr(), img.as_ptr()) == 1
-    };
-    if res {
-      Ok(())
-    } else {
-      Err(Error::CodecError("Failed to start decode image".into()))
-    }
   }
 
   pub(crate) fn decode(&self, img: &Image) -> Result<()> {

@@ -44,8 +44,8 @@ impl<'a> DumpImage<'a> {
     })
   }
 
-  pub fn start_decode(&self) -> Result<()> {
-    self.decoder.start_decode(&self.img)
+  pub fn decode(&self) -> Result<()> {
+    self.decoder.decode(&self.img)
   }
 
   pub fn get_codestream_index(&self) -> Result<CodestreamIndex> {
