@@ -65,6 +65,24 @@ impl ImageComponent {
   }
 }
 
+/// Image Data.
+#[derive(Debug, Clone)]
+pub enum ImageFormat {
+  L8,
+  La8,
+  Rgb8,
+  Rgba8,
+}
+
+/// Image Data.
+#[derive(Debug, Clone)]
+pub struct ImageData {
+  pub width: u32,
+  pub height: u32,
+  pub format: ImageFormat,
+  pub data: Vec<u8>,
+}
+
 /// A Jpeg2000 Image.
 pub struct Image {
   img: ptr::NonNull<sys::opj_image_t>,
@@ -231,62 +249,116 @@ impl Image {
     let numcomps = img.numcomps;
     unsafe { std::slice::from_raw_parts(img.comps as *mut ImageComponent, numcomps as usize) }
   }
-}
 
-/// Try to convert a loaded Jpeg 2000 image into a `image::DynamicImage`.
-#[cfg(feature = "image")]
-impl TryFrom<Image> for ::image::DynamicImage {
-  type Error = Error;
-
-  fn try_from(img: Image) -> Result<::image::DynamicImage> {
-    use ::image::*;
-    let comps = img.components();
+  /// Convert image components into pixels.
+  ///
+  /// `alpha_default` - The default value for the alpha channel if there is no alpha component.
+  pub fn get_pixels(&self, alpha_default: Option<u8>) -> Result<ImageData> {
+    let comps = self.components();
     let (width, height) = comps
       .get(0)
       .map(|c| (c.width(), c.height()))
       .ok_or_else(|| Error::UnsupportedComponentsError(0))?;
+    let has_alpha = comps.iter().any(|c| c.is_alpha());
+    let format;
 
-    let img = match comps {
-      [r] => {
-        let pixels = r.data().iter().map(|r| *r as u8).collect();
-
-        let gray = GrayImage::from_vec(width, height, pixels)
-          .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
-
-        DynamicImage::ImageLuma8(gray)
+    // Check for support color space.
+    match self.color_space() {
+      ColorSpace::Unknown | ColorSpace::Unspecified => {
+        // Assume either Grey/RGB/RGBA based on number of components.
       }
-      [r, g, b] => {
-        let len = (width * height) as usize;
-        let mut pixels = Vec::with_capacity(len * 3);
+      ColorSpace::SRGB | ColorSpace::Gray => (),
+      cs => {
+        return Err(Error::UnsupportedColorSpaceError(cs));
+      }
+    }
 
-        for (r, (g, b)) in r.data().iter().zip(g.data().iter().zip(b.data().iter())) {
-          pixels.extend_from_slice(&[*r as u8, *g as u8, *b as u8]);
+    let data = match (comps, has_alpha) {
+      ([r], _) => {
+        if let Some(alpha) = alpha_default {
+          format = ImageFormat::La8;
+          r.data().iter().flat_map(|r| [*r as u8, alpha]).collect()
+        } else {
+          format = ImageFormat::L8;
+          r.data().iter().map(|r| *r as u8).collect()
         }
-        let rgb = RgbImage::from_vec(width, height, pixels)
-          .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
-
-        DynamicImage::ImageRgb8(rgb)
       }
-      [r, g, b, a] => {
-        let len = (width * height) as usize;
-        let mut pixels = Vec::with_capacity(len * 4);
-
-        for (r, (g, (b, a))) in r
+      ([r, a], true) => {
+        format = ImageFormat::La8;
+        r.data().iter()
+          .zip(a.data().iter())
+          .flat_map(|(r, a)| [*r as u8, *a as u8])
+          .collect()
+      }
+      ([r, g, b], false) => {
+        if let Some(alpha) = alpha_default {
+          format = ImageFormat::Rgba8;
+          r.data().iter()
+            .zip(g.data().iter().zip(b.data().iter()))
+            .flat_map(|(r, (g, b))| [*r as u8, *g as u8, *b as u8, alpha])
+            .collect()
+        } else {
+          format = ImageFormat::Rgb8;
+          r.data().iter()
+            .zip(g.data().iter().zip(b.data().iter()))
+            .flat_map(|(r, (g, b))| [*r as u8, *g as u8, *b as u8])
+            .collect()
+        }
+      }
+      ([r, g, b, a], true) => {
+        format = ImageFormat::Rgba8;
+        r
           .data()
           .iter()
           .zip(g.data().iter().zip(b.data().iter().zip(a.data().iter())))
-        {
-          pixels.extend_from_slice(&[*r as u8, *g as u8, *b as u8, *a as u8]);
-        }
-        let rgba = RgbaImage::from_vec(width, height, pixels)
-          .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
-
-        DynamicImage::ImageRgba8(rgba)
+          .flat_map(|(r, (g, (b, a)))| [*r as u8, *g as u8, *b as u8, *a as u8])
+          .collect()
       }
       _ => {
-        return Err(Error::UnsupportedComponentsError(img.num_components()));
+        return Err(Error::UnsupportedComponentsError(self.num_components()));
       }
     };
-    Ok(img)
+    Ok(ImageData {
+      width, height,
+      format,
+      data,
+    })
+  }
+}
+
+/// Try to convert a loaded Jpeg 2000 image into a `image::DynamicImage`.
+#[cfg(feature = "image")]
+impl TryFrom<&Image> for ::image::DynamicImage {
+  type Error = Error;
+
+  fn try_from(img: &Image) -> Result<::image::DynamicImage> {
+    use ::image::*;
+    let ImageData { width, height, format, data } = img.get_pixels(None)?;
+    match format {
+      crate::ImageFormat::L8 => {
+        let gray = GrayImage::from_vec(width, height, data)
+          .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
+
+        Ok(DynamicImage::ImageLuma8(gray))
+      }
+      crate::ImageFormat::La8 => {
+        let gray = GrayAlphaImage::from_vec(width, height, data)
+          .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
+
+        Ok(DynamicImage::ImageLumaA8(gray))
+      }
+      crate::ImageFormat::Rgb8 => {
+        let rgb = RgbImage::from_vec(width, height, data)
+          .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
+
+        Ok(DynamicImage::ImageRgb8(rgb))
+      }
+      crate::ImageFormat::Rgba8 => {
+        let rgba = RgbaImage::from_vec(width, height, data)
+          .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
+
+        Ok(DynamicImage::ImageRgba8(rgba))
+      }
+    }
   }
 }

@@ -1,9 +1,14 @@
 use thiserror::Error;
 
+use crate::ColorSpace;
+
 #[derive(Error, Debug)]
 pub enum Error {
-  #[error("Unsupported components/color space")]
+  #[error("Unsupported components")]
   UnsupportedComponentsError(u32),
+
+  #[error("Unsupported color space: {0:?}")]
+  UnsupportedColorSpaceError(ColorSpace),
 
   #[error("Failed to create codec: {0}")]
   CreateCodecError(String),
