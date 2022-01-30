@@ -285,7 +285,8 @@ impl Image {
       }
       ([r, a], true) => {
         format = ImageFormat::La8;
-        r.data().iter()
+        r.data()
+          .iter()
           .zip(a.data().iter())
           .flat_map(|(r, a)| [*r as u8, *a as u8])
           .collect()
@@ -293,13 +294,15 @@ impl Image {
       ([r, g, b], false) => {
         if let Some(alpha) = alpha_default {
           format = ImageFormat::Rgba8;
-          r.data().iter()
+          r.data()
+            .iter()
             .zip(g.data().iter().zip(b.data().iter()))
             .flat_map(|(r, (g, b))| [*r as u8, *g as u8, *b as u8, alpha])
             .collect()
         } else {
           format = ImageFormat::Rgb8;
-          r.data().iter()
+          r.data()
+            .iter()
             .zip(g.data().iter().zip(b.data().iter()))
             .flat_map(|(r, (g, b))| [*r as u8, *g as u8, *b as u8])
             .collect()
@@ -307,8 +310,7 @@ impl Image {
       }
       ([r, g, b, a], true) => {
         format = ImageFormat::Rgba8;
-        r
-          .data()
+        r.data()
           .iter()
           .zip(g.data().iter().zip(b.data().iter().zip(a.data().iter())))
           .flat_map(|(r, (g, (b, a)))| [*r as u8, *g as u8, *b as u8, *a as u8])
@@ -319,7 +321,8 @@ impl Image {
       }
     };
     Ok(ImageData {
-      width, height,
+      width,
+      height,
       format,
       data,
     })
@@ -333,7 +336,12 @@ impl TryFrom<&Image> for ::image::DynamicImage {
 
   fn try_from(img: &Image) -> Result<::image::DynamicImage> {
     use ::image::*;
-    let ImageData { width, height, format, data } = img.get_pixels(None)?;
+    let ImageData {
+      width,
+      height,
+      format,
+      data,
+    } = img.get_pixels(None)?;
     match format {
       crate::ImageFormat::L8 => {
         let gray = GrayImage::from_vec(width, height, data)
