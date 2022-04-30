@@ -201,9 +201,9 @@ impl TileCodingParamInfo {
   }
 }
 
-pub struct TileInfo(pub(crate) sys::opj_tile_info_v2_t);
+pub struct TileInfo<'a>(pub(crate) &'a sys::opj_tile_info_v2_t);
 
-impl std::fmt::Debug for TileInfo {
+impl<'a> std::fmt::Debug for TileInfo<'a> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.debug_struct("TileInfo")
       .field("tileno", &self.0.tileno)
@@ -216,7 +216,7 @@ impl std::fmt::Debug for TileInfo {
   }
 }
 
-impl TileInfo {
+impl<'a> TileInfo<'a> {
   fn tccp_info(&self) -> Option<TileCodingParamInfo> {
     ptr::NonNull::new(self.0.tccp_info).map(|info| TileCodingParamInfo(info))
   }
@@ -331,9 +331,9 @@ impl std::fmt::Debug for CodestreamInfo {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let info = self.as_ref();
     let tile_info = if info.tile_info.is_null() {
-      TileInfo(info.m_default_tile_info)
+      TileInfo(&info.m_default_tile_info)
     } else {
-      TileInfo(unsafe { *info.tile_info })
+      TileInfo(unsafe { &*info.tile_info })
     };
     f.debug_struct("CodestreamInfo")
       .field("tx0", &info.tx0)
@@ -444,7 +444,7 @@ impl<'a> Decoder<'a> {
   pub(crate) fn setup(&self, params: &mut DecodeParameters) -> Result<()> {
     let res = unsafe {
       sys::opj_setup_decoder(self.as_ptr(), params.as_ptr()) == 1
-        && sys::opj_decoder_set_strict_mode(self.as_ptr(), params.strict as i32) == 1
+      && sys::opj_decoder_set_strict_mode(self.as_ptr(), params.strict as i32) == 1
     };
     if res {
       Ok(())

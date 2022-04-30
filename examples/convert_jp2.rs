@@ -49,7 +49,7 @@ fn main() -> Result<()> {
     jp2_image.height()
   );
 
-  let img: DynamicImage = jp2_image.try_into()?;
+  let img: DynamicImage = (&jp2_image).try_into()?;
   img.save(&savename)?;
 
   println!("Saved to: {}", savename);
