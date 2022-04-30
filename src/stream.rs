@@ -25,15 +25,11 @@ impl<'a> WrappedSlice<'a> {
     self.offset
   }
 
-  fn consume(&mut self, n_bytes: usize) -> Option<usize> {
+  fn consume(&mut self, n_bytes: usize) -> usize {
     let offset = self.offset.saturating_add(n_bytes);
     // Make sure `offset <= buf.len()`
-    if offset <= self.buf.len() {
-      self.offset = offset;
-      Some(offset)
-    } else {
-      None
-    }
+    self.offset = self.buf.len().min(offset);
+    self.offset
   }
 
   fn read_into(&mut self, out_buffer: &mut [u8]) -> Option<usize> {
@@ -47,7 +43,7 @@ impl<'a> WrappedSlice<'a> {
     // Try to fill the output buffer.
     let n_read = std::cmp::min(remaining, out_buffer.len());
     let offset = self.offset;
-    let end_off = self.consume(n_read).unwrap();
+    let end_off = self.consume(n_read);
     out_buffer[0..n_read].copy_from_slice(&self.buf[offset..end_off]);
 
     Some(n_read)
@@ -100,7 +96,7 @@ extern "C" fn buf_read_stream_read_fn(
 
 extern "C" fn buf_read_stream_skip_fn(nb_bytes: i64, p_data: *mut c_void) -> i64 {
   let slice = unsafe { &mut *(p_data as *mut WrappedSlice) };
-  slice.consume(nb_bytes as usize).map(|off| off as i64).unwrap_or(-1)
+  slice.consume(nb_bytes as usize) as i64
 }
 
 extern "C" fn buf_read_stream_seek_fn(nb_bytes: i64, p_data: *mut c_void) -> i32 {
