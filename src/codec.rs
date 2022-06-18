@@ -441,12 +441,27 @@ impl<'a> Decoder<'a> {
     Ok(Self { codec, stream })
   }
 
-  pub(crate) fn setup(&self, params: &mut DecodeParameters) -> Result<()> {
-    let res = unsafe {
-      sys::opj_setup_decoder(self.as_ptr(), params.as_ptr()) == 1
-      && sys::opj_decoder_set_strict_mode(self.as_ptr(), params.strict as i32) == 1
-    };
+  #[cfg(feature = "strict-mode")]
+  fn set_strict_mode(&self, mode: bool) -> Result<()> {
+    let res = unsafe { sys::opj_decoder_set_strict_mode(self.as_ptr(), mode as i32) == 1 };
     if res {
+      Ok(())
+    } else {
+      Err(Error::CreateCodecError(format!(
+        "Failed to set strict mode on decoder."
+      )))
+    }
+  }
+
+  #[cfg(not(feature = "strict-mode"))]
+  fn set_strict_mode(&self, _mode: bool) -> Result<()> {
+    Ok(())
+  }
+
+  pub(crate) fn setup(&self, params: &mut DecodeParameters) -> Result<()> {
+    let res = unsafe { sys::opj_setup_decoder(self.as_ptr(), params.as_ptr()) == 1 };
+    if res {
+      self.set_strict_mode(params.strict)?;
       Ok(())
     } else {
       Err(Error::CreateCodecError(format!(
