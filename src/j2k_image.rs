@@ -308,7 +308,7 @@ impl Image {
             .collect()
         }
       }
-      ([r, g, b, a], true) => {
+      ([r, g, b, a], _) => {
         format = ImageFormat::Rgba8;
         r.data()
           .iter()
@@ -335,7 +335,7 @@ impl TryFrom<&Image> for ::image::DynamicImage {
   type Error = Error;
 
   fn try_from(img: &Image) -> Result<::image::DynamicImage> {
-    use ::image::*;
+    use image::*;
     let ImageData {
       width,
       height,

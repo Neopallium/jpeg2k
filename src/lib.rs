@@ -42,14 +42,14 @@ impl From<J2KFormat> for sys::CODEC_FORMAT {
 
 pub(crate) mod codec;
 pub(crate) mod dump;
-pub(crate) mod image;
+pub(crate) mod j2k_image;
 pub(crate) mod stream;
 
 pub use codec::*;
 pub use dump::*;
 pub(crate) use stream::*;
 
-pub use self::image::*;
+pub use self::j2k_image::*;
 
 /// Image color space.
 #[derive(Debug, Clone, Copy)]
