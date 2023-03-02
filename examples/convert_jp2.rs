@@ -1,4 +1,5 @@
 use std::env;
+use std::path::Path;
 
 use anyhow::Result;
 
@@ -49,9 +50,18 @@ fn main() -> Result<()> {
     jp2_image.height()
   );
 
-  let img: DynamicImage = (&jp2_image).try_into()?;
-  img.save(&savename)?;
+  let out_name = Path::new(&savename);
+  let ext = out_name.extension().and_then(|e| e.to_str());
+  match ext {
+    Some("j2k") | Some("jp2") => {
+      jp2_image.save_as_file(out_name)?;
+    }
+    _ => {
+      let img: DynamicImage = (&jp2_image).try_into()?;
+      img.save(&savename)?;
+    }
+  }
 
-  println!("Saved to: {}", savename);
+  println!("Saved to: {out_name:?}");
   Ok(())
 }
