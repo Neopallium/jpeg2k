@@ -66,7 +66,7 @@ impl ImageComponent {
 }
 
 /// Image Data.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ImageFormat {
   L8,
   La8,

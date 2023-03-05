@@ -1,6 +1,6 @@
 [package]
 name = "jpeg2k"
-version = "0.6.3"
+version = "0.6.4"
 authors = ["Robert G. Jakabosky <rjakabosky+neopallium@neoawareness.com>"]
 edition = "2021"
 license = "MIT/Apache-2.0"
@@ -10,11 +10,11 @@ repository = "https://github.com/Neopallium/jpeg2k"
 homepage = "https://github.com/Neopallium/jpeg2k"
 
 [features]
-default = ["image", "threads"]
+default = ["image", "threads", "openjpeg-sys"]
 
 strict-mode = []
 
-threads = ["openjpeg-sys/threads"]
+threads = ["openjpeg-sys?/threads"]
 
 [dependencies]
 log = "0.4"
@@ -24,7 +24,8 @@ anyhow = "1.0"
 
 image = { version = "0.23", optional = true }
 
-openjpeg-sys = { version = ">=1.0.8", default-features = false }
+openjpeg-sys = { version = ">=1.0.8", default-features = false, optional = true }
+openjp2 = { version = "0.2", default-features = false, features = ["std"], optional = true }
 
 [dev-dependencies]
 dotenv = "0.15"

@@ -29,13 +29,22 @@ pub(crate) use format::*;
 pub mod error;
 pub(crate) use error::*;
 
+#[cfg(feature = "openjpeg-sys")]
 pub(crate) use openjpeg_sys as sys;
+
+#[cfg(feature = "openjp2")]
+pub(crate) mod sys {
+  pub use openjp2::openjpeg::*;
+  pub use openjp2::image::*;
+  pub use openjp2::cio::*;
+}
 
 impl From<J2KFormat> for sys::CODEC_FORMAT {
   fn from(format: J2KFormat) -> Self {
+    use J2KFormat::*;
     match format {
-      J2KFormat::JP2 => sys::CODEC_FORMAT::OPJ_CODEC_JP2,
-      J2KFormat::J2K => sys::CODEC_FORMAT::OPJ_CODEC_J2K,
+      JP2 => sys::CODEC_FORMAT::OPJ_CODEC_JP2,
+      J2K => sys::CODEC_FORMAT::OPJ_CODEC_J2K,
     }
   }
 }
