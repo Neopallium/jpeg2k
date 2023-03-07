@@ -28,7 +28,7 @@ anyhow = "1.0"
 image = { version = "0.23", optional = true }
 
 openjpeg-sys = { version = ">=1.0.8", default-features = false, optional = true }
-openjp2 = { version = "0.3", default-features = false, features = ["std"], optional = true, path = "/opt/openjpeg/openjp2-rs/" }
+openjp2 = { version = "0.3", default-features = false, features = ["std"], optional = true }
 
 [dev-dependencies]
 dotenv = "0.15"
