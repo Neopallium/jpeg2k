@@ -534,11 +534,13 @@ impl<'a> Decoder<'a> {
   }
 }
 
+#[cfg(feature = "file-io")]
 pub(crate) struct Encoder<'a> {
   codec: Codec,
   stream: Stream<'a>,
 }
 
+#[cfg(feature = "file-io")]
 impl<'a> Encoder<'a> {
   pub(crate) fn new(stream: Stream<'a>) -> Result<Self> {
     assert!(!stream.is_input());

@@ -1,5 +1,6 @@
 use std::ptr;
 
+#[cfg(feature = "file-io")]
 use std::path::Path;
 
 use super::*;
@@ -125,6 +126,7 @@ impl Image {
   }
 
   /// Load a Jpeg 2000 image from file.  It will detect the J2K format.
+  #[cfg(feature = "file-io")]
   pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
     let stream = Stream::from_file(path)?;
     Self::from_stream(stream, Default::default())
@@ -137,18 +139,21 @@ impl Image {
   }
 
   /// Load a Jpeg 2000 image from file.  It will detect the J2K format.
+  #[cfg(feature = "file-io")]
   pub fn from_file_with<P: AsRef<Path>>(path: P, params: DecodeParameters) -> Result<Self> {
     let stream = Stream::from_file(path)?;
     Self::from_stream(stream, params)
   }
 
   /// Save image to Jpeg 2000 file.  It will detect the J2K format.
+  #[cfg(feature = "file-io")]
   pub fn save_as_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
     let stream = Stream::to_file(path)?;
     self.to_stream(stream, Default::default())
   }
 
   /// Save image to Jpeg 2000 file.  It will detect the J2K format.
+  #[cfg(feature = "file-io")]
   pub fn save_as_file_with<P: AsRef<Path>>(&self, path: P, params: EncodeParameters) -> Result<()> {
     let stream = Stream::to_file(path)?;
     self.to_stream(stream, params)
@@ -167,6 +172,7 @@ impl Image {
     Ok(img)
   }
 
+  #[cfg(feature = "file-io")]
   fn to_stream(&self, stream: Stream<'_>, params: EncodeParameters) -> Result<()> {
     let encoder = Encoder::new(stream)?;
     encoder.setup(params, &self)?;

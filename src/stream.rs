@@ -1,6 +1,8 @@
+#[cfg(feature = "file-io")]
 use std::ffi::CString;
 use std::os::raw::c_void;
 
+#[cfg(feature = "file-io")]
 use std::path::Path;
 
 use super::*;
@@ -135,6 +137,7 @@ impl<'a> Stream<'a> {
     }
   }
 
+  #[cfg(feature = "file-io")]
   pub(crate) fn new_file<P: AsRef<Path>>(path: P, is_input: bool) -> Result<Self> {
     let path = path.as_ref();
     if !path.exists() && is_input {
@@ -163,10 +166,12 @@ impl<'a> Stream<'a> {
     })
   }
 
+  #[cfg(feature = "file-io")]
   pub(crate) fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
     Self::new_file(path, true)
   }
 
+  #[cfg(feature = "file-io")]
   pub(crate) fn to_file<P: AsRef<Path>>(path: P) -> Result<Self> {
     Self::new_file(path, false)
   }

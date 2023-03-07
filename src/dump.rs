@@ -1,3 +1,4 @@
+#[cfg(feature = "file-io")]
 use std::path::Path;
 
 use super::*;
@@ -15,6 +16,7 @@ impl<'a> DumpImage<'a> {
   }
 
   /// Load a Jpeg 2000 image from file.  It will detect the J2K format.
+  #[cfg(feature = "file-io")]
   pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
     let stream = Stream::from_file(path)?;
     Self::from_stream(stream, Default::default())
@@ -27,6 +29,7 @@ impl<'a> DumpImage<'a> {
   }
 
   /// Load a Jpeg 2000 image from file.  It will detect the J2K format.
+  #[cfg(feature = "file-io")]
   pub fn from_file_with<P: AsRef<Path>>(path: P, params: DecodeParameters) -> Result<Self> {
     let stream = Stream::from_file(path)?;
     Self::from_stream(stream, params)
