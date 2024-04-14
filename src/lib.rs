@@ -35,8 +35,6 @@ pub(crate) use openjpeg_sys as sys;
 #[cfg(feature = "openjp2")]
 pub(crate) mod sys {
   pub use openjp2::openjpeg::*;
-  pub use openjp2::image::*;
-  pub use openjp2::cio::*;
 }
 
 impl From<J2KFormat> for sys::CODEC_FORMAT {
