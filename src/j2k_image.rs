@@ -64,6 +64,46 @@ impl ImageComponent {
     let len = (self.0.w * self.0.h) as usize;
     unsafe { std::slice::from_raw_parts(self.0.data, len) }
   }
+
+  /// Component data scaled to unsigned 8bit.
+  pub fn data_u8(&self) -> Box<dyn Iterator<Item = u8>> {
+    let len = (self.0.w * self.0.h) as usize;
+    if self.is_signed() {
+      let data = unsafe { std::slice::from_raw_parts(self.0.data, len) };
+      let old_max = (1 << (self.precision() - 1)) as i64;
+      const NEW_MAX: i64 = 1 << (8 - 1);
+      Box::new(data.iter().map(move |p| {
+        (((*p as i64) * NEW_MAX) / old_max) as u8 + NEW_MAX as u8
+      }))
+    } else {
+      let data = unsafe { std::slice::from_raw_parts(self.0.data as *const u32, len) };
+      let old_max = ((1 << self.precision()) - 1) as u64;
+      const NEW_MAX: u64 = (1 << 8) - 1;
+      Box::new(data.iter().map(move |p| {
+        (((*p as u64) * NEW_MAX) / old_max) as u8
+      }))
+    }
+  }
+
+  /// Component data scaled to unsigned 16bit.
+  pub fn data_u16(&self) -> Box<dyn Iterator<Item = u16>> {
+    let len = (self.0.w * self.0.h) as usize;
+    if self.is_signed() {
+      let data = unsafe { std::slice::from_raw_parts(self.0.data, len) };
+      let old_max = (1 << (self.precision() - 1)) as i64;
+      const NEW_MAX: i64 = 1 << (16 - 1);
+      Box::new(data.iter().map(move |p| {
+        (((*p as i64) * NEW_MAX) / old_max) as u16 + NEW_MAX as u16
+      }))
+    } else {
+      let data = unsafe { std::slice::from_raw_parts(self.0.data as *const u32, len) };
+      let old_max = ((1 << self.precision()) - 1) as u64;
+      const NEW_MAX: u64 = (1 << 16) - 1;
+      Box::new(data.iter().map(move |p| {
+        (((*p as u64) * NEW_MAX) / old_max) as u16
+      }))
+    }
+  }
 }
 
 /// Image Data.
@@ -73,6 +113,23 @@ pub enum ImageFormat {
   La8,
   Rgb8,
   Rgba8,
+  L16,
+  La16,
+  Rgb16,
+  Rgba16,
+}
+
+/// Image Pixel Data.
+#[derive(Debug, Clone)]
+pub enum ImagePixelData {
+  L8(Vec<u8>),
+  La8(Vec<u8>),
+  Rgb8(Vec<u8>),
+  Rgba8(Vec<u8>),
+  L16(Vec<u16>),
+  La16(Vec<u16>),
+  Rgb16(Vec<u16>),
+  Rgba16(Vec<u16>),
 }
 
 /// Image Data.
@@ -81,7 +138,7 @@ pub struct ImageData {
   pub width: u32,
   pub height: u32,
   pub format: ImageFormat,
-  pub data: Vec<u8>,
+  pub data: ImagePixelData,
 }
 
 /// A Jpeg2000 Image.
@@ -106,6 +163,7 @@ impl std::fmt::Debug for Image {
       .field("width", &self.orig_width())
       .field("height", &self.orig_height())
       .field("color_space", &self.color_space())
+      .field("has_icc_profile", &self.has_icc_profile())
       .field("numcomps", &img.numcomps)
       .field("comps", &self.components())
       .finish()
@@ -242,6 +300,12 @@ impl Image {
     img.numcomps
   }
 
+  /// Has ICC Profile.
+  pub fn has_icc_profile(&self) -> bool {
+    let img = self.image();
+    !img.icc_profile_buf.is_null()
+  }
+
   fn component_dimensions(&self) -> Option<(u32, u32)> {
     self
       .components()
@@ -259,12 +323,13 @@ impl Image {
   /// Convert image components into pixels.
   ///
   /// `alpha_default` - The default value for the alpha channel if there is no alpha component.
-  pub fn get_pixels(&self, alpha_default: Option<u8>) -> Result<ImageData> {
+  pub fn get_pixels(&self, alpha_default: Option<u32>) -> Result<ImageData> {
     let comps = self.components();
     let (width, height) = comps
       .get(0)
       .map(|c| (c.width(), c.height()))
       .ok_or_else(|| Error::UnsupportedComponentsError(0))?;
+    let max_prec = comps.iter().fold(std::u32::MIN, |max, c| max.max(c.precision()));
     let has_alpha = comps.iter().any(|c| c.is_alpha());
     let format;
 
@@ -279,48 +344,82 @@ impl Image {
       }
     }
 
-    let data = match (comps, has_alpha) {
-      ([r], _) => {
+    let data = match (comps, has_alpha, max_prec) {
+      ([r], _, 1..=8) => {
         if let Some(alpha) = alpha_default {
           format = ImageFormat::La8;
-          r.data().iter().flat_map(|r| [*r as u8, alpha]).collect()
+          ImagePixelData::La8(r.data_u8().flat_map(|r| [r, alpha as u8]).collect())
         } else {
           format = ImageFormat::L8;
-          r.data().iter().map(|r| *r as u8).collect()
+          ImagePixelData::L8(r.data_u8().map(|r| r).collect())
         }
       }
-      ([r, a], true) => {
-        format = ImageFormat::La8;
-        r.data()
-          .iter()
-          .zip(a.data().iter())
-          .flat_map(|(r, a)| [*r as u8, *a as u8])
-          .collect()
+      ([r], _, 9..=16) => {
+        if let Some(alpha) = alpha_default {
+          format = ImageFormat::La16;
+          ImagePixelData::La16(r.data_u16().flat_map(|r| [r, alpha as u16]).collect())
+        } else {
+          format = ImageFormat::L16;
+          ImagePixelData::L16(r.data_u16().collect())
+        }
       }
-      ([r, g, b], false) => {
+      ([r, a], true, 1..=8) => {
+        format = ImageFormat::La8;
+        ImagePixelData::La8(r.data_u8()
+          .zip(a.data_u8())
+          .flat_map(|(r, a)| [r, a])
+          .collect())
+      }
+      ([r, a], true, 9..=16) => {
+        format = ImageFormat::La16;
+        ImagePixelData::La16(r.data_u16()
+          .zip(a.data_u16())
+          .flat_map(|(r, a)| [r, a])
+          .collect())
+      }
+      ([r, g, b], false, 1..=8) => {
         if let Some(alpha) = alpha_default {
           format = ImageFormat::Rgba8;
-          r.data()
-            .iter()
-            .zip(g.data().iter().zip(b.data().iter()))
-            .flat_map(|(r, (g, b))| [*r as u8, *g as u8, *b as u8, alpha])
-            .collect()
+          ImagePixelData::Rgba8(r.data_u8()
+            .zip(g.data_u8().zip(b.data_u8()))
+            .flat_map(|(r, (g, b))| [r, g, b, alpha as u8])
+            .collect())
         } else {
           format = ImageFormat::Rgb8;
-          r.data()
-            .iter()
-            .zip(g.data().iter().zip(b.data().iter()))
-            .flat_map(|(r, (g, b))| [*r as u8, *g as u8, *b as u8])
-            .collect()
+          ImagePixelData::Rgb8(r.data_u8()
+            .zip(g.data_u8().zip(b.data_u8()))
+            .flat_map(|(r, (g, b))| [r, g, b])
+            .collect())
         }
       }
-      ([r, g, b, a], _) => {
+      ([r, g, b], false, 9..=16) => {
+        if let Some(alpha) = alpha_default {
+          format = ImageFormat::Rgba16;
+          ImagePixelData::Rgba16(r.data_u16()
+            .zip(g.data_u16().zip(b.data_u16()))
+            .flat_map(|(r, (g, b))| [r, g, b, alpha as u16])
+            .collect())
+        } else {
+          format = ImageFormat::Rgb16;
+          ImagePixelData::Rgb16(r.data_u16()
+            .zip(g.data_u16().zip(b.data_u16()))
+            .flat_map(|(r, (g, b))| [r, g, b])
+            .collect())
+        }
+      }
+      ([r, g, b, a], _, 1..=8) => {
         format = ImageFormat::Rgba8;
-        r.data()
-          .iter()
-          .zip(g.data().iter().zip(b.data().iter().zip(a.data().iter())))
-          .flat_map(|(r, (g, (b, a)))| [*r as u8, *g as u8, *b as u8, *a as u8])
-          .collect()
+        ImagePixelData::Rgba8(r.data_u8()
+          .zip(g.data_u8().zip(b.data_u8().zip(a.data_u8())))
+          .flat_map(|(r, (g, (b, a)))| [r, g, b, a])
+          .collect())
+      }
+      ([r, g, b, a], _, 9..=16) => {
+        format = ImageFormat::Rgba16;
+        ImagePixelData::Rgba16(r.data_u16()
+          .zip(g.data_u16().zip(b.data_u16().zip(a.data_u16())))
+          .flat_map(|(r, (g, (b, a)))| [r, g, b, a])
+          .collect())
       }
       _ => {
         return Err(Error::UnsupportedComponentsError(self.num_components()));
@@ -345,33 +444,57 @@ impl TryFrom<&Image> for ::image::DynamicImage {
     let ImageData {
       width,
       height,
-      format,
       data,
+      ..
     } = img.get_pixels(None)?;
-    match format {
-      crate::ImageFormat::L8 => {
+    match data {
+      crate::ImagePixelData::L8(data) => {
         let gray = GrayImage::from_vec(width, height, data)
           .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
 
         Ok(DynamicImage::ImageLuma8(gray))
       }
-      crate::ImageFormat::La8 => {
+      crate::ImagePixelData::La8(data) => {
         let gray = GrayAlphaImage::from_vec(width, height, data)
           .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
 
         Ok(DynamicImage::ImageLumaA8(gray))
       }
-      crate::ImageFormat::Rgb8 => {
+      crate::ImagePixelData::Rgb8(data) => {
         let rgb = RgbImage::from_vec(width, height, data)
           .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
 
         Ok(DynamicImage::ImageRgb8(rgb))
       }
-      crate::ImageFormat::Rgba8 => {
+      crate::ImagePixelData::Rgba8(data) => {
         let rgba = RgbaImage::from_vec(width, height, data)
           .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
 
         Ok(DynamicImage::ImageRgba8(rgba))
+      }
+      crate::ImagePixelData::L16(data) => {
+        let gray = ImageBuffer::from_vec(width, height, data)
+          .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
+
+        Ok(DynamicImage::ImageLuma16(gray))
+      }
+      crate::ImagePixelData::La16(data) => {
+        let gray = ImageBuffer::from_vec(width, height, data)
+          .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
+
+        Ok(DynamicImage::ImageLumaA16(gray))
+      }
+      crate::ImagePixelData::Rgb16(data) => {
+        let rgb = ImageBuffer::from_vec(width, height, data)
+          .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
+
+        Ok(DynamicImage::ImageRgb16(rgb))
+      }
+      crate::ImagePixelData::Rgba16(data) => {
+        let rgba = ImageBuffer::from_vec(width, height, data)
+          .expect("Shouldn't happen.  Report to jpeg2k if you see this.");
+
+        Ok(DynamicImage::ImageRgba16(rgba))
       }
     }
   }
