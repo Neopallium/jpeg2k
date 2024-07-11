@@ -72,11 +72,10 @@ impl ImageComponent {
       let data = unsafe { std::slice::from_raw_parts(self.0.data, len) };
       let old_max = (1 << (self.precision() - 1)) as i64;
       const NEW_MAX: i64 = 1 << (8 - 1);
-      const ADJUST: u8 = (NEW_MAX - 1) as u8;
       Box::new(
         data
           .iter()
-          .map(move |p| (((*p as i64) * NEW_MAX) / old_max) as u8 + ADJUST),
+          .map(move |p| ((((*p as i64) * NEW_MAX) / old_max) + NEW_MAX) as u8),
       )
     } else {
       let data = unsafe { std::slice::from_raw_parts(self.0.data as *const u32, len) };
@@ -97,11 +96,10 @@ impl ImageComponent {
       let data = unsafe { std::slice::from_raw_parts(self.0.data, len) };
       let old_max = (1 << (self.precision() - 1)) as i64;
       const NEW_MAX: i64 = 1 << (16 - 1);
-      const ADJUST: u16 = (NEW_MAX - 1) as u16;
       Box::new(
         data
           .iter()
-          .map(move |p| (((*p as i64) * NEW_MAX) / old_max) as u16 + ADJUST),
+          .map(move |p| ((((*p as i64) * NEW_MAX) / old_max) + NEW_MAX) as u16),
       )
     } else {
       let data = unsafe { std::slice::from_raw_parts(self.0.data as *const u32, len) };
