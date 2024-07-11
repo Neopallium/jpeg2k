@@ -72,16 +72,20 @@ impl ImageComponent {
       let data = unsafe { std::slice::from_raw_parts(self.0.data, len) };
       let old_max = (1 << (self.precision() - 1)) as i64;
       const NEW_MAX: i64 = 1 << (8 - 1);
-      Box::new(data.iter().map(move |p| {
-        (((*p as i64) * NEW_MAX) / old_max) as u8 + NEW_MAX as u8
-      }))
+      Box::new(
+        data
+          .iter()
+          .map(move |p| (((*p as i64) * NEW_MAX) / old_max) as u8 + NEW_MAX as u8),
+      )
     } else {
       let data = unsafe { std::slice::from_raw_parts(self.0.data as *const u32, len) };
       let old_max = ((1 << self.precision()) - 1) as u64;
       const NEW_MAX: u64 = (1 << 8) - 1;
-      Box::new(data.iter().map(move |p| {
-        (((*p as u64) * NEW_MAX) / old_max) as u8
-      }))
+      Box::new(
+        data
+          .iter()
+          .map(move |p| (((*p as u64) * NEW_MAX) / old_max) as u8),
+      )
     }
   }
 
@@ -92,16 +96,20 @@ impl ImageComponent {
       let data = unsafe { std::slice::from_raw_parts(self.0.data, len) };
       let old_max = (1 << (self.precision() - 1)) as i64;
       const NEW_MAX: i64 = 1 << (16 - 1);
-      Box::new(data.iter().map(move |p| {
-        (((*p as i64) * NEW_MAX) / old_max) as u16 + NEW_MAX as u16
-      }))
+      Box::new(
+        data
+          .iter()
+          .map(move |p| (((*p as i64) * NEW_MAX) / old_max) as u16 + NEW_MAX as u16),
+      )
     } else {
       let data = unsafe { std::slice::from_raw_parts(self.0.data as *const u32, len) };
       let old_max = ((1 << self.precision()) - 1) as u64;
       const NEW_MAX: u64 = (1 << 16) - 1;
-      Box::new(data.iter().map(move |p| {
-        (((*p as u64) * NEW_MAX) / old_max) as u16
-      }))
+      Box::new(
+        data
+          .iter()
+          .map(move |p| (((*p as u64) * NEW_MAX) / old_max) as u16),
+      )
     }
   }
 }
@@ -329,7 +337,9 @@ impl Image {
       .get(0)
       .map(|c| (c.width(), c.height()))
       .ok_or_else(|| Error::UnsupportedComponentsError(0))?;
-    let max_prec = comps.iter().fold(std::u32::MIN, |max, c| max.max(c.precision()));
+    let max_prec = comps
+      .iter()
+      .fold(std::u32::MIN, |max, c| max.max(c.precision()));
     let has_alpha = comps.iter().any(|c| c.is_alpha());
     let format;
 
@@ -365,61 +375,77 @@ impl Image {
       }
       ([r, a], true, 1..=8) => {
         format = ImageFormat::La8;
-        ImagePixelData::La8(r.data_u8()
-          .zip(a.data_u8())
-          .flat_map(|(r, a)| [r, a])
-          .collect())
+        ImagePixelData::La8(
+          r.data_u8()
+            .zip(a.data_u8())
+            .flat_map(|(r, a)| [r, a])
+            .collect(),
+        )
       }
       ([r, a], true, 9..=16) => {
         format = ImageFormat::La16;
-        ImagePixelData::La16(r.data_u16()
-          .zip(a.data_u16())
-          .flat_map(|(r, a)| [r, a])
-          .collect())
+        ImagePixelData::La16(
+          r.data_u16()
+            .zip(a.data_u16())
+            .flat_map(|(r, a)| [r, a])
+            .collect(),
+        )
       }
       ([r, g, b], false, 1..=8) => {
         if let Some(alpha) = alpha_default {
           format = ImageFormat::Rgba8;
-          ImagePixelData::Rgba8(r.data_u8()
-            .zip(g.data_u8().zip(b.data_u8()))
-            .flat_map(|(r, (g, b))| [r, g, b, alpha as u8])
-            .collect())
+          ImagePixelData::Rgba8(
+            r.data_u8()
+              .zip(g.data_u8().zip(b.data_u8()))
+              .flat_map(|(r, (g, b))| [r, g, b, alpha as u8])
+              .collect(),
+          )
         } else {
           format = ImageFormat::Rgb8;
-          ImagePixelData::Rgb8(r.data_u8()
-            .zip(g.data_u8().zip(b.data_u8()))
-            .flat_map(|(r, (g, b))| [r, g, b])
-            .collect())
+          ImagePixelData::Rgb8(
+            r.data_u8()
+              .zip(g.data_u8().zip(b.data_u8()))
+              .flat_map(|(r, (g, b))| [r, g, b])
+              .collect(),
+          )
         }
       }
       ([r, g, b], false, 9..=16) => {
         if let Some(alpha) = alpha_default {
           format = ImageFormat::Rgba16;
-          ImagePixelData::Rgba16(r.data_u16()
-            .zip(g.data_u16().zip(b.data_u16()))
-            .flat_map(|(r, (g, b))| [r, g, b, alpha as u16])
-            .collect())
+          ImagePixelData::Rgba16(
+            r.data_u16()
+              .zip(g.data_u16().zip(b.data_u16()))
+              .flat_map(|(r, (g, b))| [r, g, b, alpha as u16])
+              .collect(),
+          )
         } else {
           format = ImageFormat::Rgb16;
-          ImagePixelData::Rgb16(r.data_u16()
-            .zip(g.data_u16().zip(b.data_u16()))
-            .flat_map(|(r, (g, b))| [r, g, b])
-            .collect())
+          ImagePixelData::Rgb16(
+            r.data_u16()
+              .zip(g.data_u16().zip(b.data_u16()))
+              .flat_map(|(r, (g, b))| [r, g, b])
+              .collect(),
+          )
         }
       }
       ([r, g, b, a], _, 1..=8) => {
         format = ImageFormat::Rgba8;
-        ImagePixelData::Rgba8(r.data_u8()
-          .zip(g.data_u8().zip(b.data_u8().zip(a.data_u8())))
-          .flat_map(|(r, (g, (b, a)))| [r, g, b, a])
-          .collect())
+        ImagePixelData::Rgba8(
+          r.data_u8()
+            .zip(g.data_u8().zip(b.data_u8().zip(a.data_u8())))
+            .flat_map(|(r, (g, (b, a)))| [r, g, b, a])
+            .collect(),
+        )
       }
       ([r, g, b, a], _, 9..=16) => {
         format = ImageFormat::Rgba16;
-        ImagePixelData::Rgba16(r.data_u16()
-          .zip(g.data_u16().zip(b.data_u16().zip(a.data_u16())))
-          .flat_map(|(r, (g, (b, a)))| [r, g, b, a])
-          .collect())
+        ImagePixelData::Rgba16(
+          r.data_u16()
+            .zip(g.data_u16().zip(b.data_u16().zip(a.data_u16())))
+            .flat_map(|(r, (g, (b, a)))| [r, g, b, a])
+            .collect(),
+        )
       }
       _ => {
         return Err(Error::UnsupportedComponentsError(self.num_components()));

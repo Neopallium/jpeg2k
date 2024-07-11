@@ -1,6 +1,6 @@
+use std::env;
 use std::fs::File;
 use std::io::Read;
-use std::env;
 
 use rayon::prelude::*;
 
@@ -37,12 +37,15 @@ fn main() -> Result<()> {
   let mut buf = Vec::new();
   file.read_to_end(&mut buf)?;
 
-  let imgs = (0..repeat).into_par_iter().map(|_i| {
-    let jp2 = DumpImage::from_bytes_with(buf.as_slice(), params.clone())
-      .expect("Image read header.");
+  let imgs = (0..repeat)
+    .into_par_iter()
+    .map(|_i| {
+      let jp2 =
+        DumpImage::from_bytes_with(buf.as_slice(), params.clone()).expect("Image read header.");
 
-    (jp2.img.num_components(), jp2.img.width(), jp2.img.height())
-  }).collect::<Vec<_>>();
+      (jp2.img.num_components(), jp2.img.width(), jp2.img.height())
+    })
+    .collect::<Vec<_>>();
 
   let mut total_components = 0;
   let mut is_first = true;

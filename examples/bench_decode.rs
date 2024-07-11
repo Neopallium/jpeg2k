@@ -1,6 +1,6 @@
+use std::env;
 use std::fs::File;
 use std::io::Read;
-use std::env;
 
 #[cfg(not(feature = "threads"))]
 use rayon::prelude::*;
@@ -44,14 +44,16 @@ fn main() -> Result<()> {
   #[cfg(feature = "threads")]
   let range = (0..repeat).into_iter();
 
-  let imgs = range.map(|_i| {
-    let img = Image::from_bytes_with(buf.as_slice(), params.clone())
-      .expect("Image decode")
-      .get_pixels(None)
-      .expect("Pixels");
+  let imgs = range
+    .map(|_i| {
+      let img = Image::from_bytes_with(buf.as_slice(), params.clone())
+        .expect("Image decode")
+        .get_pixels(None)
+        .expect("Pixels");
 
-    (img.data.len(), img.width, img.height)
-  }).collect::<Vec<_>>();
+      (img.data.len(), img.width, img.height)
+    })
+    .collect::<Vec<_>>();
 
   let mut is_first = true;
   let mut total_pixels = 0;
