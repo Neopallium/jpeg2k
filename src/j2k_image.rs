@@ -118,6 +118,7 @@ impl ImageComponent {
 
 /// Image Data.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ImageFormat {
   L8,
   La8,
@@ -131,6 +132,7 @@ pub enum ImageFormat {
 
 /// Image Pixel Data.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ImagePixelData {
   L8(Vec<u8>),
   La8(Vec<u8>),
@@ -144,6 +146,7 @@ pub enum ImagePixelData {
 
 /// Image Data.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ImageData {
   pub width: u32,
   pub height: u32,
