@@ -159,9 +159,12 @@ pub struct Image {
 
 impl Drop for Image {
   fn drop(&mut self) {
+    #[cfg(feature = "openjpeg-sys")]
     unsafe {
       sys::opj_image_destroy(self.img.as_ptr());
     }
+    #[cfg(feature = "openjp2")]
+    sys::opj_image_destroy(self.img.as_ptr());
   }
 }
 

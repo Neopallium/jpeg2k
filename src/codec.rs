@@ -53,7 +53,7 @@ impl DecodeArea {
   }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct DecodeParameters {
   params: sys::opj_dparameters,
   area: Option<DecodeArea>,
@@ -123,7 +123,7 @@ impl DecodeParameters {
   }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct EncodeParameters(sys::opj_cparameters);
 
 impl Default for EncodeParameters {
