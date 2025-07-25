@@ -3,6 +3,7 @@ use std::os::raw::{c_char, c_void};
 use std::ptr;
 
 use log::{log_enabled, Level};
+
 use super::*;
 
 /// The area of the source image to decode.
