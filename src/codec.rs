@@ -3,7 +3,6 @@ use std::os::raw::{c_char, c_void};
 use std::ptr;
 
 use log::{log_enabled, Level};
-
 use super::*;
 
 /// The area of the source image to decode.
@@ -115,6 +114,12 @@ impl DecodeParameters {
   /// If `area == None`, then the whole image will be decoded.  This is the defult.
   pub fn decode_area(mut self, area: Option<DecodeArea>) -> Self {
     self.area = area;
+    self
+  }
+
+  /// Ignore palette color, component mapping and color defintion.
+  pub fn ignore_pclr_cmap_cdef(mut self) -> Self {
+    self.params.flags |= sys::OPJ_DPARAMETERS_IGNORE_PCLR_CMAP_CDEF_FLAG;
     self
   }
 
