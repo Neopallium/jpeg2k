@@ -118,6 +118,12 @@ impl DecodeParameters {
     self
   }
 
+  /// Ignore palette colors, component mappings and color definitions.
+  pub fn ignore_pclr_cmap_cdef(mut self) -> Self {
+    self.params.flags |= sys::OPJ_DPARAMETERS_IGNORE_PCLR_CMAP_CDEF_FLAG;
+    self
+  }
+
   pub(crate) fn as_ptr(&mut self) -> &mut sys::opj_dparameters {
     &mut self.params
   }
