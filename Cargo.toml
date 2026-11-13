@@ -10,6 +10,7 @@ repository = "https://github.com/Neopallium/jpeg2k"
 homepage = "https://github.com/Neopallium/jpeg2k"
 
 exclude = [
+  "benches/*",
   "examples/*",
   "samples/*",
 ]
