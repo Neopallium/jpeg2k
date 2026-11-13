@@ -1,6 +1,6 @@
 [package]
 name = "jpeg2k"
-version = "0.10.1"
+version = "0.11.0"
 authors = ["Robert G. Jakabosky <rjakabosky+neopallium@neoawareness.com>"]
 edition = "2021"
 license = "MIT/Apache-2.0"
@@ -15,33 +15,35 @@ exclude = [
 ]
 
 [features]
-default = ["image", "threads", "file-io", "openjpeg-sys"]
+default = ["image", "threads"]
 
-strict-mode = []
+# Enable the `image` crate interop (`get_pixels`/`ImageData`/`ImagePixelData`
+# and the `DynamicImage` conversions).
+image = ["openjp2/image", "dep:image"]
 
-# Enable file IO APIs.
-file-io = ["openjp2?/file-io"]
+# Enable multi-threaded decode/encode (openjp2's `rayon` feature).
+threads = ["openjp2/rayon"]
 
-threads = ["openjpeg-sys?/threads"]
+# `serde` derives for `ImageData`/`ImagePixelData` (and the other
+# `openjp2` safe-API types), forwarded to `openjp2`'s `serde` feature.
+serde = ["openjp2/serde"]
+
+# Write the upstream OpenJPEG product/version string into the default
+# codestream comment (COM) marker, making encoded files byte-identical
+# to the C reference (openjp2's `openjpeg-version-string` feature).
+openjpeg-version-string = ["openjp2/openjpeg-version-string"]
 
 [dependencies]
-log = "0.4"
+openjp2 = { version = "0.7.2", default-features = false }
 
-thiserror = "1.0.30"
-anyhow = "1.0"
-
-image = { version = "0.25", default_features = false, features = ["jpeg", "png"], optional = true }
-
-openjpeg-sys = { version = ">=1.0.8", default-features = false, optional = true }
-openjp2 = { version = "0.6.1", default-features = false, features = ["std"], optional = true }
-
-serde = { version = "1.0", features = ["derive"], optional = true }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"], optional = true }
 
 [dev-dependencies]
 dotenv = "0.15"
 env_logger = "0.9"
 criterion = "0.3"
 rayon = "1.7"
+anyhow = "1.0"
 
 [[bench]]
 name = "components"
